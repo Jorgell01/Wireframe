@@ -1,0 +1,94 @@
+<header class="topbar">
+  <div class="topbar__left">
+    <img src="../assets/img/logos/LOGO CIFP VIRGEN DE CANDELARIA.png" alt="Logo" class="topbar__logo" />
+    <span class="topbar__title">Dashboard</span>
+  </div>
+
+  <div class="topbar__center">
+    <input id="globalSearch" class="topbar__search" type="search" placeholder="Buscar..." aria-label="Buscar en el panel" />
+  </div>
+
+  <div class="topbar__right">
+    <span class="topbar__user">👤 <span id="headerUser">Usuario</span></span>
+    <button id="logoutBtn" class="topbar__btn">Salir</button>
+  </div>
+</header>
+
+<style>
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; gap: 12px;
+    padding: 12px 16px;
+    background: #121826; border-bottom: 1px solid #1f2937;
+  }
+  .topbar__left { 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+  }
+  .topbar__logo { 
+    width: 28px; 
+    height: 28px; 
+    border-radius: 6px; 
+    object-fit: cover; 
+  }
+  .topbar__title { 
+    font-weight: 700; 
+    letter-spacing: .3px; 
+  }
+  .topbar__center { 
+    display: flex; 
+    justify-content: center; 
+  }
+  .topbar__search {
+    width: 100%; 
+    max-width: 420px; 
+    padding: 8px 12px;
+    border-radius: 10px; 
+    border: 1px solid #374151; 
+    background: #1e293b; 
+    color: #e5e7eb;
+  }
+  .topbar__search:focus { 
+    outline: none; 
+    border-color: #7c3aed; 
+  }
+  .topbar__right { 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    justify-content: end; 
+  }
+  .topbar__btn {
+    background: #7c3aed; 
+    border: none; 
+    padding: 8px 12px; 
+    border-radius: 10px;
+    color: #fff; 
+    font-weight: 600; 
+    cursor: pointer;
+  }
+  .topbar__btn:hover { 
+    background: #6d28d9; 
+  }
+  .topbar__user { 
+    color: #9ca3af; 
+  }
+</style>
+
+<script>
+  // Rellena el nombre y gestiona el logout
+  (function() {
+    const u = localStorage.getItem("usuario");
+    const nameSpan = document.getElementById("headerUser");
+    if (u && nameSpan) nameSpan.textContent = u;
+
+    document.getElementById("logoutBtn")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      localStorage.removeItem("usuario");
+      // desde /views/dashboard.html -> login.html
+      location.href = "login.html";
+    });
+  })();
+</script>

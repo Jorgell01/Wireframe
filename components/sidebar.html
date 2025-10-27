@@ -1,0 +1,55 @@
+<aside class="sidebar">
+  <nav class="sidebar__nav" aria-label="Menú principal">
+    <ul class="sidebar__list">
+      <li><a class="sidebar__link is-active" href="#">🏠 Dashboard</a></li>
+      <li><a class="sidebar__link" href="#">📁 Proyectos</a></li>
+      <li><a class="sidebar__link" href="#">👥 Usuarios</a></li>
+      <li><a class="sidebar__link" href="#">📊 Informes</a></li>
+      <li><a class="sidebar__link" href="#">⚙️ Ajustes</a></li>
+    </ul>
+  </nav>
+
+  <div class="sidebar__footer">
+    <small class="sidebar__version">v0.1 • Wireframe</small>
+  </div>
+</aside>
+
+<style>
+  .sidebar {
+    display: flex; 
+    flex-direction: column; 
+    gap: 16px;
+    height: 100%;
+  }
+  .sidebar__nav { 
+    flex: 1; 
+  }
+  .sidebar__list { 
+    list-style: none; 
+    padding: 0; 
+    margin: 0; 
+    display: grid; 
+    gap: 8px; 
+  }
+  .sidebar__link {
+    display: block; 
+    padding: 10px 12px; 
+    border-radius: 10px;
+    color: #e5e7eb; 
+    text-decoration: none; 
+    border: 1px solid transparent;
+  }
+  .sidebar__link:hover { 
+    background: #1e293b; 
+    border-color: #374151; 
+  }
+  .sidebar__link.is-active { 
+    background: #1e293b; 
+    border-color: #7c3aed; 
+  }
+  .sidebar__footer { 
+    color: #9ca3af; 
+    border-top: 1px solid #1f2937; 
+    padding-top: 10px; 
+    }
+</style>
