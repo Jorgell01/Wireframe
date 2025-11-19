@@ -109,5 +109,3 @@ Jorge A. Herrero Santana (Pude)
 
 Proyecto Intermodular — 2025
 IES Canarias
-
-Si quieres que haga cambios adicionales al README (por ejemplo añadir capturas, un `LICENSE`, o comandos `npm`), dime qué prefieres y lo actualizo.
