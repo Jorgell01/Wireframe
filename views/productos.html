@@ -1,0 +1,36 @@
+<section>
+  <h2>Productos</h2>
+  <p id="productos-status">Cargando lista de productos...</p>
+  <div id="productos-list"></div>
+
+  <script>
+    (async function(){
+      const listEl = document.getElementById('productos-list');
+      const status = document.getElementById('productos-status');
+      try {
+        // Usar helper API si existe (apunta a json-server en localhost:3001)
+        const loader = (window.API && window.API.get) ? window.API.get('/productos') : fetch('/productos');
+        const res = await loader;
+        if (!res.ok) throw new Error('No hay API disponible');
+        const data = await res.json();
+        if (!data.length) { status.textContent = 'No hay productos registrados.'; return; }
+        status.textContent = '';
+        const table = document.createElement('table');
+        table.className = 'table';
+        table.innerHTML = `
+          <thead><tr><th>Id</th><th>Nombre</th><th>Precio</th><th>Stock</th></tr></thead>
+          <tbody>${data.map(p=>`<tr><td>${p.id}</td><td>${p.name||p.nombre||'-'}</td><td>${p.price||p.precio||'-'}</td><td>${p.stock||'-'}</td></tr>`).join('')}</tbody>`;
+        listEl.appendChild(table);
+      } catch (e) {
+        status.textContent = 'No se ha podido cargar la API. Muestra de ejemplo:';
+        listEl.innerHTML = `
+          <ul class="list">
+            <li class="list-item">Producto A — 10€ — Stock 12</li>
+            <li class="list-item">Producto B — 24,5€ — Stock 7</li>
+            <li class="list-item">Producto C — 5€ — Stock 80</li>
+          </ul>`;
+        console.warn(e);
+      }
+    })();
+  </script>
+</section>

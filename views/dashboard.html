@@ -7,28 +7,24 @@
   <link rel="stylesheet" href="../assets/css/style.css">
   <link rel="stylesheet" href="../assets/css/dashboard.css">
 </head>
-
 <body>
   <header id="mainHeader"></header>
 
   <main class="dashboard-container">
-
     <aside id="sidebar"></aside>
 
     <section class="dashboard-content">
       <h1>Bienvenido, <span id="userName"></span> 👋</h1>
 
-      <div class="cards">
-        <div class="card">Módulo 1</div>
-        <div class="card">Módulo 2</div>
-        <div class="card">Módulo 3</div>
-      </div>
+      <!-- Aquí se pintarán las "páginas" de la SPA -->
+      <div id="app"></div>
     </section>
-
   </main>
 
   <footer id="mainFooter"></footer>
 
   <script src="../assets/js/dashboard.js" defer></script>
+  <script src="../assets/js/router.js" defer></script>
+  <script src="../assets/js/api.js" defer></script>
 </body>
 </html>

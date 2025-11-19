@@ -1,9 +1,28 @@
+:root {
+  /* Paleta inspirada en el logo CIFP Virgen de Candelaria */
+  --black: #0b0b0b;        /* fondo principal oscuro */
+  --cream: #fff7ed;        /* superficies claras (tarjetas, formularios) */
+  --cream-weak: #fff3e8;   /* variante suave para inputs, tablas, etc */
+  --surface-dark: #0f1720; /* sidebar, header, paneles oscuros */
+
+  --text-on-dark: #fff7ed; /* texto claro sobre fondos oscuros */
+  --text-on-cream: #0b0b0b;/* texto oscuro sobre crema */
+
+  --muted: #8b8b8b;        /* textos secundarios */
+  --accent: #d9482b;       /* rojo/engranaje del logo */
+  --accent-dark: #b83621;  /* versión más oscura para hover */
+  --border: #263139;       /* bordes discretos */
+  --success: #16a34a;      /* verde para acciones OK */
+  --danger: #ef4444;       /* rojo error */
+}
+
 body {
   font-family: "Segoe UI", sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #0b0e14;
-  color: #f1f1f1;
+  /* Fondo global cambiado a crema */
+  background-color: var(--cream);
+  color: var(--text-on-cream);
 }
 
 h1 {
@@ -11,19 +30,19 @@ h1 {
 }
 
 a {
-  color: #22d3ee;
+  color: var(--accent);
   text-decoration: none;
 }
 
 button {
-  background: #7c3aed;
+  background: var(--accent);
   border: none;
   padding: 10px 16px;
-  color: white;
+  color: var(--text-on-cream);
   border-radius: 8px;
   cursor: pointer;
 }
 
 button:hover {
-  background: #6d28d9;
+  background: var(--accent-dark);
 }

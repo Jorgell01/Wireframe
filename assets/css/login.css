@@ -3,14 +3,15 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: linear-gradient(135deg, #0b0e14, #1e293b);
+  /* Fondo uniforme crema para toda la página */
+  background: linear-gradient(135deg, var(--cream), var(--cream-weak));
 }
 
 .login-box {
-  background-color: #121826;
+  background-color: var(--cream);
   padding: 40px 50px;
   border-radius: 15px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   text-align: center;
   width: 320px;
 }
@@ -23,13 +24,13 @@
 .login-box h1 {
   font-size: 1.6em;
   margin-bottom: 20px;
-  color: #e5e7eb;
+  color: var(--text-on-cream);
 }
 
 .login-box h2 {
   font-size: 1.2em;
   margin-bottom: 30px;
-  color: #9ca3af;
+  color: var(--muted);
 }
 
 .login-box form {
@@ -41,36 +42,36 @@
 .login-box input {
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid #374151;
-  background-color: #1e293b;
-  color: #f3f4f6;
+  border: 1px solid var(--border);
+  background-color: var(--cream-weak);
+  color: var(--text-on-cream);
   outline: none;
   transition: border 0.3s;
 }
 
 .login-box input:focus {
-  border-color: #7c3aed;
+  border-color: var(--accent);
 }
 
 .login-box button {
-  background: #7c3aed;
+  background: var(--accent);
   padding: 10px;
   border: none;
   border-radius: 8px;
-  color: white;
+  color: var(--text-on-cream);
   font-weight: bold;
   cursor: pointer;
   transition: background 0.3s;
 }
 
 .login-box button:hover {
-  background: #6d28d9;
+  background: var(--accent-dark);
 }
 
 .register-link {
   margin-top: 10px;
   font-size: 0.9em;
-  color: #9ca3af;
+  color: var(--muted);
 }
 
 .register-link a:hover {
@@ -78,7 +79,7 @@
 }
 
 .error-message {
-  color: #ef4444;
+  color: var(--danger);
   margin-top: 10px;
   font-size: 0.9em;
 }

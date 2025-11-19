@@ -1,0 +1,30 @@
+<section>
+  <h2>Categorías</h2>
+  <p id="categorias-status">Cargando categorías...</p>
+  <div id="categorias-list"></div>
+
+  <script>
+    (async function(){
+      const listEl = document.getElementById('categorias-list');
+      const status = document.getElementById('categorias-status');
+      try {
+        const loader = (window.API && window.API.get) ? window.API.get('/categorias') : fetch('/categorias');
+        const res = await loader;
+        if (!res.ok) throw new Error('No hay API disponible');
+        const data = await res.json();
+        status.textContent = '';
+        if (!data.length) { status.textContent = 'No hay categorías.'; return; }
+        listEl.innerHTML = `<ul class="list">${data.map(c=>`<li class="list-item">${c.id} — ${c.name||c.nombre}</li>`).join('')}</ul>`;
+      } catch (e) {
+        status.textContent = 'No se ha podido conectar con la API. Ejemplo:';
+        listEl.innerHTML = `
+          <ul class="list">
+            <li class="list-item">1 — Alimentación</li>
+            <li class="list-item">2 — Electrónica</li>
+            <li class="list-item">3 — Textil</li>
+          </ul>`;
+        console.warn(e);
+      }
+    })();
+  </script>
+</section>
