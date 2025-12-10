@@ -36,7 +36,6 @@ npm install
 npm run api
 ```
 
-<<<<<<< HEAD
 Esto expone `http://localhost:3001` leyendo `data/db.json`. `window.API` lo detecta automáticamente en local.
 
 Login/Registro:
