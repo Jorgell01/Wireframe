@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pedidos profesores | Proyecto</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<section>
+  <h2>📨 Pedidos de Profesores</h2>
+
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+    <div style="flex:1;min-width:300px;">
+      <label class="form-row"><span style="font-weight:600">Buscar/Filtrar</span><input id="pp-filter" placeholder="Texto..." /></label>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="btnNewPP" class="btn-primary">Nuevo Pedido Profesor</button>
+    </div>
+  </div>
+
+  <div id="ppListArea"><p>Cargando pedidos de profesores...</p></div>
+
+  <div id="ppFormArea" style="margin-top:12px;"></div>
+
+  <script>
+    (async function(){
+      const listArea = document.getElementById('ppListArea');
+      const formArea = document.getElementById('ppFormArea');
+      const filter = document.getElementById('pp-filter');
+      const btnNew = document.getElementById('btnNewPP');
+
+      async function loadPedidos(){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get('/pedidos_profesores') : await fetch('/pedidos_profesores');
+          if(!res.ok) throw new Error('No API');
+          return await res.json();
+        }catch(e){ console.warn('loadPedidos', e); return []; }
+      }
+
+      async function loadProducts(){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get('/productos') : await fetch('/productos');
+          if(!res.ok) throw new Error('No products');
+          return await res.json();
+        }catch(e){ console.warn('loadProducts', e); return []; }
+      }
+
+      let products = await loadProducts();
+
+      function renderList(items){
+        if(!items.length) { listArea.innerHTML = '<p>No hay pedidos de profesores.</p>'; return; }
+        const html = items.map(p=>{
+          const total = (p.lineas||[]).reduce((s,l)=>s + (Number(l.qty||0)||0),0);
+          return `<div style="border:1px solid #eee;padding:10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between"><div>
+            <strong>${p.id}</strong> — ${p.profesor || ''}<div style="color:var(--muted);font-size:0.9rem">Aula: ${p.aula||'-'} — Líneas: ${(p.lineas||[]).length} — Total unidades: ${total}</div>
+          </div>
+          <div style="display:flex;gap:8px"><button class="btn-small btn-edit" data-id="${p.id}">Editar</button><button class="btn-small btn-delete" data-id="${p.id}">Borrar</button></div></div>`;
+        }).join('');
+        listArea.innerHTML = html;
+        listArea.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click', onDelete));
+        listArea.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click', onEdit));
+      }
+
+      async function refresh(){
+        const arr = await loadPedidos();
+        const q = filter.value.trim().toLowerCase();
+        const out = arr.filter(p=>{ if(!q) return true; return (p.id||'').toLowerCase().includes(q) || (p.profesor||'').toLowerCase().includes(q); });
+        renderList(out);
+      }
+
+      filter.addEventListener('input', refresh);
+      btnNew.addEventListener('click', ()=> showForm());
+
+      function showForm(initial){
+        formArea.innerHTML = '';
+        const wrap = document.createElement('div'); wrap.className = 'product-form-wrapper';
+        wrap.innerHTML = `
+          <h3>${initial ? 'Editar Pedido Profesor' : 'Nuevo Pedido Profesor'}</h3>
+          <div class="form-row"><label>Id <input id="pp-id" value="${initial?.id||('PP-'+Date.now())}" /></label></div>
+          <div class="form-row"><label>Profesor <input id="pp-profesor" value="${initial?.profesor||''}" /></label></div>
+          <div class="form-row"><label>Aula <input id="pp-aula" value="${initial?.aula||''}" /></label></div>
+          <div style="margin-top:8px"><strong>Líneas</strong><div id="pp-lines" style="margin-top:8px"></div>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+              <select id="pp-prodSel"><option value="">Cargando productos...</option></select>
+              <input id="pp-qty" type="number" min="1" value="1" style="width:90px" />
+              <button id="pp-addLine" class="btn-secondary">Agregar línea</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px"><button id="pp-save" class="btn-primary">Guardar</button><button id="pp-cancel" class="btn-secondary">Cancelar</button></div>
+        `;
+        formArea.appendChild(wrap);
+
+        const prodSel = document.getElementById('pp-prodSel'); const linesDiv = document.getElementById('pp-lines');
+        prodSel.innerHTML = '<option value="">-- Selecciona producto --</option>' + products.map(p=>`<option value="${p.id}" data-name="${p.nombre||p.name||''}">${p.id} — ${p.nombre||p.name||''}</option>`).join('');
+
+        let lines = (initial && initial.lineas) ? initial.lineas.map(l=>({ productId: l.productId, productName: l.productName || l.nombre || '', qty: Number(l.qty||0) })) : [];
+
+        function renderLines(){
+          if(!lines.length) { linesDiv.innerHTML = '<p>No hay líneas añadidas.</p>'; return; }
+          linesDiv.innerHTML = '<table class="table"><thead><tr><th>Producto</th><th>Nombre</th><th>Cantidad</th><th></th></tr></thead><tbody>' +
+            lines.map((ln,i)=>`<tr data-i="${i}"><td>${ln.productId}</td><td>${ln.productName}</td><td><input class="line-qty" data-i="${i}" type="number" value="${ln.qty}" style="width:80px" /></td><td><button class="btn-small btn-rem" data-i="${i}">Eliminar</button></td></tr>`).join('') +
+            '</tbody></table>';
+          linesDiv.querySelectorAll('.btn-rem').forEach(b=>b.addEventListener('click', (e)=>{ const i=Number(e.target.getAttribute('data-i')); lines.splice(i,1); renderLines(); }));
+          linesDiv.querySelectorAll('.line-qty').forEach(inp=>inp.addEventListener('change', (e)=>{ const i=Number(e.target.getAttribute('data-i')); lines[i].qty = Number(e.target.value || 0); }));
+        }
+
+        renderLines();
+
+        document.getElementById('pp-addLine').addEventListener('click', ()=>{
+          const pid = prodSel.value; if(!pid) return alert('Selecciona un producto');
+          const pname = prodSel.options[prodSel.selectedIndex].getAttribute('data-name') || 'Producto';
+          const qty = Number(document.getElementById('pp-qty').value) || 1;
+          const existing = lines.find(x=>String(x.productId) === String(pid));
+          if(existing){ existing.qty += qty; } else { lines.push({ productId: pid, productName: pname, qty }); }
+          renderLines();
+        });
+
+        document.getElementById('pp-cancel').addEventListener('click', ()=>{ formArea.innerHTML=''; });
+
+        document.getElementById('pp-save').addEventListener('click', async ()=>{
+          const payload = { id: document.getElementById('pp-id').value.trim(), profesor: document.getElementById('pp-profesor').value.trim(), aula: document.getElementById('pp-aula').value.trim(), date: new Date().toISOString(), lineas: lines.map(l=>({ productId: l.productId, productName: l.productName, qty: l.qty })) };
+          if(!payload.id) return alert('El ID es obligatorio');
+          try{
+            if(initial && initial.id){
+              const res = (window.API && window.API.put) ? await window.API.put(`/pedidos_profesores/${initial.id}`, payload) : await fetch(`/pedidos_profesores/${initial.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+              if(!res.ok) throw new Error('Error actualizando');
+            } else {
+              const res = (window.API && window.API.post) ? await window.API.post('/pedidos_profesores', payload) : await fetch('/pedidos_profesores', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+              if(!res.ok) throw new Error('Error creando');
+            }
+            formArea.innerHTML='';
+            await refresh();
+          }catch(e){ alert('Error guardando pedido: '+e.message); }
+        });
+      }
+
+      async function onDelete(e){
+        const id = e.target.getAttribute('data-id');
+        if(!confirm('Borrar pedido '+id+'?')) return;
+        try{
+          const res = (window.API && window.API.del) ? await window.API.del(`/pedidos_profesores/${id}`) : await fetch(`/pedidos_profesores/${id}`, { method:'DELETE' });
+          if(!res.ok) throw new Error('Error borrando');
+          await refresh();
+        }catch(e){ alert('No se pudo borrar: '+e.message); }
+      }
+
+      function onEdit(e){
+        const id = e.target.getAttribute('data-id');
+        (async ()=>{
+          try{
+            const res = (window.API && window.API.get) ? await window.API.get(`/pedidos_profesores/${id}`) : await fetch(`/pedidos_profesores/${id}`);
+            if(!res.ok) throw new Error('No encontrado');
+            const p = await res.json();
+            showForm(p);
+          }catch(e){ alert('No se pudo cargar pedido: '+e.message); }
+        })();
+      }
+
+      await refresh();
+
+    })();
+  </script>
+</section>
+</body>
+</html>

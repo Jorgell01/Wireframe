@@ -1,0 +1,258 @@
+<section>
+  <h2>📤 Salida de materiales</h2>
+
+  <div class="product-form-wrapper">
+    <form id="salidaForm">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <div style="min-width:200px;display:flex;align-items:center;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="salidaImmediateMode" /> <span style="font-size:0.95rem">Modo inmediato (resta al escanear)</span></label>
+        </div>
+        <div class="form-row" style="flex:1;min-width:180px;">
+          <label>Producto</label>
+          <select id="salidaProducto"></select>
+        </div>
+
+        <div class="form-row" style="min-width:180px;">
+          <label>Proveedor</label>
+          <select id="salidaProveedor"></select>
+        </div>
+
+        <div class="form-row" style="width:120px;">
+          <label>Cantidad</label>
+          <input id="salidaCantidad" type="number" min="1" value="1" />
+        </div>
+
+        <div style="display:flex;align-items:flex-end;gap:8px;">
+          <button id="salidaAddLine" type="button" class="btn-secondary">Agregar línea</button>
+        </div>
+      </div>
+
+      <div id="salidaLinesArea" style="margin-top:12px;"></div>
+
+      <div class="form-actions" style="margin-top:8px;">
+        <button id="salidaSubmit" class="btn-primary">Registrar salidas</button>
+        <button id="salidaClear" type="button" class="btn-secondary">Limpiar</button>
+      </div>
+    </form>
+  </div>
+
+  <h3>Historial de salidas</h3>
+  <div id="salidaLogArea"></div>
+
+  <!-- Toast container -->
+  <div id="toastContainer" aria-live="polite" style="position:fixed;right:16px;bottom:16px;z-index:9999"></div>
+
+  <script>
+    (async function(){
+      const productoSel = document.getElementById('salidaProducto');
+      const cantidadInput = document.getElementById('salidaCantidad');
+      const form = document.getElementById('salidaForm');
+      const logArea = document.getElementById('salidaLogArea');
+
+      async function loadProducts(){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get('/productos') : await fetch('/productos');
+          if (!res.ok) throw new Error('API no disponible');
+          const productos = await res.json();
+          productoSel.innerHTML = productos.map(p=>`<option value="${p.id}">${p.id} — ${p.nombre}</option>`).join('');
+          return productos;
+        }catch(e){
+          productoSel.innerHTML = '<option value="">(API no disponible)</option>';
+          return [];
+        }
+      }
+
+      async function loadProviders(){
+        const sel = document.getElementById('salidaProveedor');
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get('/proveedores') : await fetch('/proveedores');
+          if(!res.ok) throw new Error('No providers');
+          const provs = await res.json();
+          sel.innerHTML = provs.map(p=>`<option value="${p.id}">${p.nombre || p.razonSocial || p.id}</option>`).join('');
+          return provs;
+        }catch(e){
+          sel.innerHTML = '<option value="">(No hay proveedores)</option>';
+          return [];
+        }
+      }
+
+      function renderLogTable(logs){
+        if(!logs || !logs.length) return '<p>No hay registros.</p>';
+        const rows = logs.map(l=>`<tr><td>${l.date}</td><td>${l.productId}</td><td>${l.productName||'-'}</td><td>${l.providerName||'-'}</td><td>${l.qty}</td><td>${l.type}</td></tr>`).join('');
+        return `<table class="table"><thead><tr><th>Fecha</th><th>Producto</th><th>Nombre</th><th>Proveedor</th><th>Cantidad</th><th>Tipo</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+
+      function loadLog(){
+        let logs = [];
+        try{ logs = JSON.parse(localStorage.getItem('salidaLog') || '[]'); }catch(e){ logs = []; }
+        logArea.innerHTML = renderLogTable(logs);
+      }
+
+      const productos = await loadProducts();
+      const proveedores = await loadProviders();
+      loadLog();
+
+      // manejar múltiples líneas
+      let pending = [];
+      const linesArea = document.getElementById('salidaLinesArea');
+      const toastContainer = document.getElementById('toastContainer');
+      const immediateCheckbox = document.getElementById('salidaImmediateMode');
+      let undoStack = [];
+
+      function showToast(message, {timeout=8000, undoLabel='Undo', onUndo} = {}){
+        const id = 'toast-'+Date.now()+'-'+Math.floor(Math.random()*10000);
+        const el = document.createElement('div');
+        el.id = id;
+        el.style.background = '#222';
+        el.style.color = '#fff';
+        el.style.padding = '10px 12px';
+        el.style.marginTop = '8px';
+        el.style.borderRadius = '6px';
+        el.style.boxShadow = '0 6px 18px rgba(0,0,0,0.2)';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.gap = '12px';
+        el.innerHTML = `<div style="flex:1">${message}</div>`;
+        if(typeof onUndo === 'function'){
+          const btn = document.createElement('button');
+          btn.className = 'btn-small';
+          btn.textContent = undoLabel;
+          btn.addEventListener('click', ()=>{
+            try{ onUndo(); }catch(e){ console.error(e); }
+            if(el.parentNode) el.parentNode.removeChild(el);
+          });
+          el.appendChild(btn);
+        }
+        toastContainer.appendChild(el);
+        const to = setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); }, timeout);
+        return { id, clear: ()=>{ clearTimeout(to); if(el.parentNode) el.parentNode.removeChild(el); } };
+      }
+
+      function renderPending(){
+        if(!pending.length){ linesArea.innerHTML = '<p>No hay líneas añadidas.</p>'; return; }
+        const rows = pending.map((ln, i)=>`<tr data-i="${i}"><td>${ln.productId}</td><td>${ln.name}</td><td>${ln.providerName||'-'}</td><td>${ln.qty}</td><td><button class="btn-small btn-delete-line" data-i="${i}">Eliminar</button></td></tr>`).join('');
+        linesArea.innerHTML = `<table class="table"><thead><tr><th>Producto</th><th>Nombre</th><th>Proveedor</th><th>Cantidad</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+        linesArea.querySelectorAll('.btn-delete-line').forEach(b=>b.addEventListener('click', (e)=>{ const i = Number(e.target.getAttribute('data-i')); pending.splice(i,1); renderPending(); }));
+      }
+
+      document.getElementById('salidaAddLine').addEventListener('click', ()=>{
+        const id = productoSel.value; const name = productoSel.options[productoSel.selectedIndex]?.text || '';
+        const provId = document.getElementById('salidaProveedor').value;
+        const provName = document.getElementById('salidaProveedor').options[document.getElementById('salidaProveedor').selectedIndex]?.text || '';
+        const qty = Math.max(0, parseInt(cantidadInput.value) || 0);
+        if(!id || qty <= 0) return alert('Selecciona producto, proveedor y cantidad válida');
+        // si ya existe la misma combinación producto+proveedor, sumar cantidad
+        const existing = pending.find(x=>String(x.productId)===String(id) && String(x.providerId)===String(provId));
+        if(existing){ existing.qty += qty; } else { pending.push({ productId: id, name: name, providerId: provId, providerName: provName, qty }); }
+        renderPending();
+        // toast feedback for manual add
+        showToast(`Línea añadida: ${name} x${qty}`, { timeout: 2500 });
+      });
+
+      document.getElementById('salidaClear').addEventListener('click', ()=>{ pending = []; renderPending(); });
+
+      form.addEventListener('submit', async (ev)=>{
+        ev.preventDefault();
+        if(!pending.length) return alert('Añade al menos una línea antes de enviar');
+        try{
+          for(const ln of pending){
+            const id = ln.productId; const qty = ln.qty; const provId = ln.providerId; const provName = ln.providerName;
+            const resP = (window.API && window.API.get) ? await window.API.get(`/productos/${id}`) : await fetch(`/productos/${id}`);
+            if (!resP.ok) { console.warn('Producto no encontrado', id); continue; }
+            const p = await resP.json();
+            const current = Number(p.stock) || 0;
+            if (qty > current) { alert('Cantidad superior al stock actual para producto ' + id); continue; }
+            const newStock = current - qty;
+            const updated = { ...p, stock: newStock };
+            const res = (window.API && window.API.put) ? await window.API.put(`/productos/${id}`, updated) : await fetch(`/productos/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)});
+            if (!res.ok) { console.warn('Error actualizando', id); continue; }
+
+            const entry = { date: new Date().toLocaleString(), productId: p.id, productName: p.nombre, providerId: provId, providerName: provName, qty, type: 'salida' };
+            let logs = [];
+            try{ logs = JSON.parse(localStorage.getItem('salidaLog') || '[]'); }catch(e){ logs = []; }
+            logs.unshift(entry);
+            localStorage.setItem('salidaLog', JSON.stringify(logs));
+          }
+          pending = [];
+          renderPending();
+          loadLog();
+          alert('Salidas registradas. Stocks actualizados.');
+        }catch(err){ console.error(err); alert('Error procesando salidas: '+err.message); }
+      });
+
+      // --- Barcode scanner integration (safe: add to pending for salida) ---
+      async function findProductByCode(code){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get(`/productos?codigo=${encodeURIComponent(code)}`) : await fetch(`/productos?codigo=${encodeURIComponent(code)}`);
+          if(!res.ok) return null;
+          const arr = await res.json();
+          return arr[0] || null;
+        }catch(e){ console.error('findProductByCode', e); return null; }
+      }
+
+      async function onScanInSalida(code){
+        const p = await findProductByCode(code);
+        if(!p){
+          if(typeof showCreateProductForm === 'function') return showCreateProductForm({ codigo: code });
+          return alert('Producto no encontrado: ' + code);
+        }
+        const provId = document.getElementById('salidaProveedor').value;
+        const provName = document.getElementById('salidaProveedor').options[document.getElementById('salidaProveedor').selectedIndex]?.text || '';
+        const immediate = immediateCheckbox && immediateCheckbox.checked;
+        if(!immediate){
+          const existing = pending.find(x=>String(x.productId)===String(p.id) && String(x.providerId)===String(provId));
+          if(existing){ existing.qty = Number(existing.qty||0) + 1; } else { pending.push({ productId: p.id, name: p.nombre, providerId: provId, providerName: provName, qty: 1 }); }
+          renderPending();
+          showToast(`Línea añadida por escaneo: ${p.nombre} x1`, { timeout: 2500 });
+          return;
+        }
+
+        // Immediate mode: decrement stock now with undo
+        try{
+          const resP = (window.API && window.API.get) ? await window.API.get(`/productos/${p.id}`) : await fetch(`/productos/${p.id}`);
+          if(!resP.ok) return showToast('Error: no se encontró el producto en el servidor', { timeout:3000 });
+          const prod = await resP.json();
+          const current = Number(prod.stock) || 0;
+          if(current <= 0) return showToast(`Stock insuficiente: ${prod.nombre}`, { timeout:3000 });
+          const newStock = current - 1;
+          const updated = { ...prod, stock: newStock };
+          const res = (window.API && window.API.put) ? await window.API.put(`/productos/${prod.id}`, updated) : await fetch(`/productos/${prod.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(updated) });
+          if(!res.ok) return showToast('Error actualizando stock', { timeout:3000 });
+
+          // log entry with unique id
+          const entryId = Date.now() + '-' + Math.floor(Math.random()*10000);
+          const entry = { id: entryId, date: new Date().toLocaleString(), productId: prod.id, productName: prod.nombre, providerId: provId, providerName: provName, qty: 1, type: 'salida' };
+          let logs = [];
+          try{ logs = JSON.parse(localStorage.getItem('salidaLog') || '[]'); }catch(e){ logs = []; }
+          logs.unshift(entry);
+          localStorage.setItem('salidaLog', JSON.stringify(logs));
+          loadLog();
+
+          // setup undo
+          const toast = showToast(`Salida registrada: ${prod.nombre} (-1)`, { timeout: 8000, undoLabel: 'Deshacer', onUndo: async ()=>{
+            try{
+              // restore stock
+              const restore = (window.API && window.API.get) ? await window.API.get(`/productos/${prod.id}`) : await fetch(`/productos/${prod.id}`);
+              if(!restore.ok){ showToast('Error al leer producto para deshacer', { timeout:3000 }); return; }
+              const latest = await restore.json();
+              const restored = { ...latest, stock: (Number(latest.stock) || 0) + 1 };
+              const put = (window.API && window.API.put) ? await window.API.put(`/productos/${prod.id}`, restored) : await fetch(`/productos/${prod.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(restored) });
+              if(!put.ok){ showToast('Error al deshacer la salida', { timeout:3000 }); return; }
+              // remove log entry
+              let curLogs = [];
+              try{ curLogs = JSON.parse(localStorage.getItem('salidaLog') || '[]'); }catch(e){ curLogs = []; }
+              curLogs = curLogs.filter(x=>x.id !== entryId);
+              localStorage.setItem('salidaLog', JSON.stringify(curLogs));
+              loadLog();
+              showToast('Salida deshecha', { timeout:2500 });
+            }catch(e){ console.error('undo error', e); showToast('Error al deshacer', { timeout:3000 }); }
+          }});
+
+        }catch(e){ console.error(e); showToast('Error procesando escaneo', { timeout:3000 }); }
+      }
+
+      window.addEventListener('barcodeScanned', (e)=>{ onScanInSalida(e.detail.code); });
+      window.onBarcodeScanned = async function(code){ await onScanInSalida(code); };
+    })();
+  </script>
+</section>

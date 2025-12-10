@@ -1,0 +1,479 @@
+<section>
+  <h2>Productos</h2>
+
+  <div class="product-controls" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px;">
+    <div style="flex:1;min-width:260px;">
+      <label class="form-row">
+        <span style="font-weight:600">Buscar</span>
+        <input id="filterText" type="search" placeholder="Nombre, descripción..." />
+      </label>
+    </div>
+
+    <div style="min-width:180px;">
+      <label class="form-row">
+        <span style="font-weight:600">Categoría</span>
+        <select id="filterCategory"><option value="">Todas</option></select>
+      </label>
+    </div>
+
+    <div style="min-width:180px;">
+      <label class="form-row">
+        <span style="font-weight:600">Proveedor</span>
+        <select id="filterProvider"><option value="">Todos</option></select>
+      </label>
+    </div>
+
+    <div style="min-width:140px;">
+      <label class="form-row">
+        <span style="font-weight:600">Precio min</span>
+        <input id="filterMinPrice" type="number" step="0.01" placeholder="0" />
+      </label>
+    </div>
+
+    <div style="min-width:140px;">
+      <label class="form-row">
+        <span style="font-weight:600">Precio max</span>
+        <input id="filterMaxPrice" type="number" step="0.01" placeholder="" />
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:flex-end;">
+      <button id="btnResetFilters" class="btn-secondary">Reset</button>
+    </div>
+
+    <div style="margin-left:auto;">
+      <button id="btnCreateProduct" class="btn-primary">Crear producto</button>
+    </div>
+  </div>
+
+  <div id="product-form-area" style="margin-bottom:12px;"></div>
+
+  <div id="product-details-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:1000;">
+    <div style="background:#fff;border-radius:10px;max-width:800px;width:90%;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <h3 style="margin:0">Detalle de producto</h3>
+        <button id="pd-close" class="btn-secondary">Cerrar</button>
+      </div>
+      <div id="pd-body" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <p id="productos-status">Cargando lista de productos...</p>
+  <div id="productos-list"></div>
+
+  <script>
+    (async function(){
+      const status = document.getElementById('productos-status');
+      const listEl = document.getElementById('productos-list');
+      const categorySel = document.getElementById('filterCategory');
+      const providerSel = document.getElementById('filterProvider');
+      const filterText = document.getElementById('filterText');
+      const minPrice = document.getElementById('filterMinPrice');
+      const maxPrice = document.getElementById('filterMaxPrice');
+      const resetBtn = document.getElementById('btnResetFilters');
+      const createBtn = document.getElementById('btnCreateProduct');
+      const formArea = document.getElementById('product-form-area');
+
+      let products = [];
+      let categories = [];
+      let providers = [];
+
+      // Simple-DataTables lazy loader and instance holder
+      let dataTableInstance = null;
+      async function ensureDataTableLib(){
+        if (window.simpleDatatables && window.simpleDatatables.DataTable) return true;
+        if (!document.getElementById('sdt-css')){
+          const link = document.createElement('link');
+          link.id = 'sdt-css'; link.rel = 'stylesheet';
+          link.href = 'https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css';
+          document.head.appendChild(link);
+        }
+        if (!document.getElementById('sdt-js')){
+          await new Promise((resolve, reject)=>{
+            const s = document.createElement('script');
+            s.id = 'sdt-js'; s.src = 'https://cdn.jsdelivr.net/npm/simple-datatables@latest';
+            s.onload = resolve; s.onerror = reject; document.body.appendChild(s);
+          });
+        }
+        return true;
+      }
+
+      function renderTable(items) {
+        if (!items.length) { listEl.innerHTML = '<p>No hay productos que coincidan.</p>'; return; }
+          // leer mapa de supresión de alertas
+        let suppressMap = {};
+        try { suppressMap = JSON.parse(localStorage.getItem('suppressAlerts') || '{}'); } catch(e) { suppressMap = {}; }
+        const table = document.createElement('table');
+        table.className = 'table';
+          table.innerHTML = `
+            <thead><tr><th>Imagen</th><th>Id</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Acciones</th></tr></thead>
+            <tbody>${items.map(p=>{
+              const hasMin = typeof p.stockMinimo !== 'undefined' && p.stockMinimo !== null;
+              const isBelow = hasMin ? (Number(p.stock) < Number(p.stockMinimo)) : false;
+              const suppressed = !!suppressMap[String(p.id)];
+              const alertActive = isBelow && !suppressed;
+              const imgUrl = p.imagenUrl || p.imageUrl || '';
+              return `<tr data-id="${p.id}" class="${alertActive ? 'row-alert' : ''}">
+                <td>${imgUrl ? `<img src="${imgUrl}" alt="${p.nombre||p.name||''}" loading="lazy" style="width:72px;height:72px;object-fit:cover;border-radius:8px;" />` : ''}</td>
+                <td>${p.id}</td>
+                <td class="prod-name">${p.nombre||p.name||'-'}</td>
+                <td>${(p.categoria && p.categoria.nombre) || categories.find(c=>String(c.id)===String(p.categoriaId))?.nombre || '-'}</td>
+                <td>${p.precio ?? p.price ?? '-'} ${p.unidadPrecio ? p.unidadPrecio : ''}</td>
+                <td>${p.stock ?? '-'}</td>
+                <td>
+                  <button class="btn-small js-details">Ver</button>
+                  <a class="btn-small" href="#/producto/${p.id}">Abrir</a>
+                  <button class="btn-small btn-edit js-edit">Editar</button>
+                  <button class="btn-small btn-delete js-delete">Borrar</button>
+                </td>
+              </tr>`
+            }).join('')}</tbody>`;
+        listEl.innerHTML = '';
+        listEl.appendChild(table);
+
+        // enhance with Simple-DataTables (pagination/sort)
+        ensureDataTableLib().then(()=>{
+          if (dataTableInstance && dataTableInstance.destroy){ dataTableInstance.destroy(); dataTableInstance = null; }
+          dataTableInstance = new window.simpleDatatables.DataTable(table, {
+            searchable: true,
+            fixedHeight: false,
+            perPage: 10,
+            labels: { placeholder: 'Buscar…', perPage: '{select} por página', noRows: 'Sin datos', info: 'Mostrando {start} a {end} de {rows}' }
+          });
+        }).catch(e=>{ console.warn('No se pudo cargar Simple-DataTables', e); });
+
+        // acciones se gestionan por delegación más abajo (no enlazar aquí)
+      }
+
+      function applyFilters() {
+        const q = filterText.value.trim().toLowerCase();
+        const cid = categorySel.value;
+        const pid = providerSel.value;
+        const min = parseFloat(minPrice.value) || null;
+        const max = parseFloat(maxPrice.value) || null;
+        const out = products.filter(p=>{
+          if (q) {
+            const t = ((p.nombre||p.name||'') + ' ' + (p.descripcion||p.description||'')).toLowerCase();
+            if (!t.includes(q)) return false;
+          }
+          if (cid && String(p.categoriaId||p.categoria?.id) !== String(cid)) return false;
+          if (pid && String(p.proveedorId||p.proveedor?.id) !== String(pid)) return false;
+          const price = parseFloat(p.precio ?? p.price ?? 0);
+          if (min !== null && price < min) return false;
+          if (max !== null && price > max) return false;
+          return true;
+        });
+        renderTable(out);
+      }
+
+      resetBtn.addEventListener('click', ()=>{
+        filterText.value=''; categorySel.value=''; providerSel.value=''; minPrice.value=''; maxPrice.value=''; applyFilters();
+      });
+
+      function sampleData() {
+        return [
+          { id: 's1', nombre: 'Producto A', precio: 10, stock: 12, categoriaId: '', proveedorId: ''},
+          { id: 's2', nombre: 'Producto B', precio: 24.5, stock: 7, categoriaId: '', proveedorId: ''}
+        ];
+      }
+
+      // Fetch categories and providers to fill selects
+      try {
+        const catLoader = (window.API && window.API.get) ? window.API.get('/categorias') : fetch('/categorias');
+        const provLoader = (window.API && window.API.get) ? window.API.get('/proveedores') : fetch('/proveedores');
+        const [catRes, provRes] = await Promise.all([catLoader, provLoader]);
+        if (catRes.ok) { categories = await catRes.json(); }
+        if (provRes.ok) { providers = await provRes.json(); }
+      } catch (e) {
+        console.warn('No se pudieron cargar categorías/proveedores', e);
+        categories = [];
+        providers = [];
+      }
+
+      // populate selects
+      categories.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.nombre||c.name; categorySel.appendChild(o); });
+      providers.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.nombre||p.name; providerSel.appendChild(o); });
+
+      // Fetch products
+      try {
+        const loader = (window.API && window.API.get) ? window.API.get('/productos') : fetch('/productos');
+        const res = await loader;
+        if (!res.ok) throw new Error('No hay API disponible');
+        products = await res.json();
+        status.textContent = '';
+      } catch (e) {
+        console.warn(e);
+        status.textContent = 'Usando datos de ejemplo (API no disponible)';
+        products = sampleData();
+      }
+
+      // Render initial
+      applyFilters();
+
+      // Si venimos con intención de abrir edición desde la vista dedicada
+      try{
+        const toEditId = localStorage.getItem('openEditProductId');
+        if (toEditId) {
+          localStorage.removeItem('openEditProductId');
+          const item = products.find(p=>String(p.id)===String(toEditId));
+          if (item) {
+            // Abrir directamente el formulario de edición
+            showProductForm(item);
+          }
+        }
+      }catch(_){ }
+
+      // bind filter inputs
+      [filterText, categorySel, providerSel, minPrice, maxPrice].forEach(el=>el.addEventListener('input', applyFilters));
+
+      // Create product form
+      createBtn.addEventListener('click', ()=>{
+        showProductForm();
+      });
+
+      function showProductForm(initial) {
+        formArea.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'product-form-wrapper';
+        wrapper.innerHTML = `
+          <h3>${initial ? 'Editar producto' : 'Nuevo producto'}</h3>
+          <div class="form-row">
+            <label style="display:flex;gap:8px;align-items:center;width:100%">Código
+              <input id="pf-codigo" value="${initial?.codigo||''}" style="flex:1" />
+              <button type="button" id="pf-off" class="btn-secondary" title="Buscar en Open Food Facts">OFF</button>
+            </label>
+          </div>
+          <div class="form-row"><label>Nombre<input id="pf-name" value="${initial?.nombre||''}" /></label></div>
+          <div class="form-row"><label>Descripción
+            <textarea id="pf-desc" rows="3" style="width:100%">${initial?.descripcion||initial?.description||''}</textarea>
+          </label></div>
+          <div class="form-row"><label>Imagen (URL)<input id="pf-image" value="${initial?.imagenUrl||initial?.imageUrl||''}" /></label></div>
+          <div id="pf-image-preview" style="margin:4px 0 8px 0;">${(initial?.imagenUrl||initial?.imageUrl)?`<img src="${initial?.imagenUrl||initial?.imageUrl}" alt="Vista previa" style="max-width:160px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1)" />`:''}</div>
+          <div class="form-row"><label>Peso
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="pf-peso" type="number" step="0.001" value="${initial?.peso ?? ''}" style="flex:1" />
+              <select id="pf-peso-unit" style="min-width:120px">
+                <option value="">--</option>
+                <option value="g" ${initial?.unidadPeso==='g'?'selected':''}>g</option>
+                <option value="kg" ${initial?.unidadPeso==='kg'?'selected':''}>kg</option>
+                <option value="ml" ${initial?.unidadPeso==='ml'?'selected':''}>ml</option>
+                <option value="l" ${initial?.unidadPeso==='l'?'selected':''}>l</option>
+                <option value="unidad" ${initial?.unidadPeso==='unidad'?'selected':''}>unidad</option>
+              </select>
+            </div>
+          </label></div>
+          <div class="form-row"><label>Precio
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="pf-price" type="number" step="0.01" value="${initial?.precio||''}" style="flex:1" />
+              <select id="pf-price-unit" style="min-width:140px">
+                <option value="">--</option>
+                <option value="EUR" ${initial?.unidadPrecio==='EUR'?'selected':''}>EUR</option>
+                <option value="EUR/kg" ${initial?.unidadPrecio==='EUR/kg'?'selected':''}>EUR/kg</option>
+                <option value="EUR/g" ${initial?.unidadPrecio==='EUR/g'?'selected':''}>EUR/g</option>
+                <option value="EUR/l" ${initial?.unidadPrecio==='EUR/l'?'selected':''}>EUR/l</option>
+                <option value="EUR/unidad" ${initial?.unidadPrecio==='EUR/unidad'?'selected':''}>EUR/unidad</option>
+              </select>
+            </div>
+          </label></div>
+          <div class="form-row"><label>Stock mínimo<input id="pf-stock-min" type="number" value="${initial?.stockMinimo ?? ''}" /></label></div>
+          <div class="form-row"><label>Stock actual<input id="pf-stock" type="number" value="${initial?.stock||''}" /></label></div>
+          <div class="form-row"><label>Categoría
+            <select id="pf-cat"><option value="">--</option>${categories.map(c=>`<option value="${c.id}" ${initial && String(initial.categoriaId)===String(c.id)?'selected':''}>${c.nombre||c.name}</option>`).join('')}
+            </select>
+          </label></div>
+          <div class="form-row"><label>Proveedor
+            <select id="pf-prov"><option value="">--</option>${providers.map(p=>`<option value="${p.id}" ${initial && String(initial.proveedorId)===String(p.id)?'selected':''}>${p.nombre||p.name}</option>`).join('')}
+            </select>
+          </label></div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button id="pf-save" class="btn-primary">Guardar</button>
+            <button id="pf-cancel" class="btn-secondary">Cancelar</button>
+          </div>
+        `;
+        formArea.appendChild(wrapper);
+        // smooth scroll and focus
+        try { wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_){ }
+        try { document.getElementById('pf-name').focus(); } catch(_){ }
+
+        document.getElementById('pf-cancel').addEventListener('click', ()=>{ formArea.innerHTML=''; });
+        // preview image when URL changes
+        document.getElementById('pf-image').addEventListener('input', ()=>{
+          const url = document.getElementById('pf-image').value.trim();
+          const prev = document.getElementById('pf-image-preview');
+          prev.innerHTML = url ? `<img src="${url}" alt="Vista previa" loading="lazy" style="max-width:160px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1)" />` : '';
+        });
+        // Open Food Facts: auto-rellenar por código
+        document.getElementById('pf-off').addEventListener('click', async ()=>{
+          const code = (document.getElementById('pf-codigo').value || '').trim();
+          if (!code) { alert('Introduce el código de barras primero'); return; }
+          try{
+            const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`, { cache: 'no-cache' });
+            if (!res.ok) throw new Error('Error consultando OFF');
+            const data = await res.json();
+            if (data.status !== 1 || !data.product) { alert('No encontrado en Open Food Facts'); return; }
+            const p = data.product;
+            const guessName = p.product_name_es || p.product_name || '';
+            document.getElementById('pf-name').value = guessName;
+            // set image url if present
+            const img = p.image_front_url || p.image_url || '';
+            if (img) {
+              document.getElementById('pf-image').value = img;
+              const prev = document.getElementById('pf-image-preview');
+              prev.innerHTML = `<img src="${img}" alt="Vista previa" loading="lazy" style="max-width:160px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1)" />`;
+            }
+          }catch(err){ alert('OFF: '+ err.message); }
+        });
+        document.getElementById('pf-save').addEventListener('click', async ()=>{
+          const payload = {
+            codigo: document.getElementById('pf-codigo').value.trim() || undefined,
+            nombre: document.getElementById('pf-name').value.trim(),
+            imagenUrl: document.getElementById('pf-image').value.trim() || undefined,
+            descripcion: document.getElementById('pf-desc').value.trim() || undefined,
+            peso: (document.getElementById('pf-peso').value !== '') ? parseFloat(document.getElementById('pf-peso').value) : undefined,
+            unidadPeso: document.getElementById('pf-peso-unit').value || undefined,
+            precio: parseFloat(document.getElementById('pf-price').value) || 0,
+            unidadPrecio: document.getElementById('pf-price-unit').value || undefined,
+            stockMinimo: (document.getElementById('pf-stock-min').value !== '') ? parseInt(document.getElementById('pf-stock-min').value) : undefined,
+            stock: parseInt(document.getElementById('pf-stock').value) || 0,
+            categoriaId: (function(){ const v = document.getElementById('pf-cat').value; const n = parseInt(v, 10); return v ? (isNaN(n) ? v : n) : null; })(),
+            proveedorId: (function(){ const v = document.getElementById('pf-prov').value; const n = parseInt(v, 10); return v ? (isNaN(n) ? v : n) : null; })()
+          };
+          try {
+            if (initial && initial.id) {
+              const res = (window.API && window.API.put) ? await window.API.put(`/productos/${initial.id}`, payload) : await fetch(`/productos/${initial.id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+              if (!res.ok) throw new Error('Error actualizando');
+              // update local array
+              const idx = products.findIndex(x=>String(x.id)===String(initial.id));
+              products[idx] = { ...products[idx], ...payload };
+            } else {
+              const res = (window.API && window.API.post) ? await window.API.post('/productos', payload) : await fetch('/productos', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+              if (!res.ok) throw new Error('Error creando');
+              const created = await res.json();
+              products.unshift(created);
+            }
+            formArea.innerHTML='';
+            applyFilters();
+          } catch (err) {
+            alert('Error guardando producto: '+err.message);
+          }
+        });
+      }
+
+      function openDetailsModal(p){
+        const modal = document.getElementById('product-details-modal');
+        const body = document.getElementById('pd-body');
+        const imgUrl = p.imagenUrl || p.imageUrl || '';
+        const provName = (p.proveedor && p.proveedor.nombre) || providers.find(r=>String(r.id)===String(p.proveedorId))?.nombre || '-';
+        body.innerHTML = `
+          <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start;">
+            <div>${imgUrl ? `<img src="${imgUrl}" alt="${p.nombre||p.name||''}" style="width:100%;max-width:280px;border-radius:8px;object-fit:cover;" />` : '<div style="width:100%;max-width:280px;height:180px;background:#eee;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#777;">Sin imagen</div>'}</div>
+            <div>
+              <h4 style="margin:0 0 8px 0;">${p.nombre||p.name||'-'}</h4>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
+                <div><strong>Proveedor:</strong> ${provName}</div>
+                <div><strong>Peso:</strong> ${(p.peso ?? '')} ${p.unidadPeso || ''}</div>
+                <div><strong>Stock mínimo:</strong> ${typeof p.stockMinimo !== 'undefined' && p.stockMinimo !== null ? p.stockMinimo : '-'}</div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <strong>Alerta:</strong>
+                  <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" class="suppress-alert-checkbox" data-id="${p.id}" ${(()=>{try{const m=JSON.parse(localStorage.getItem('suppressAlerts')||'{}');return m[String(p.id)]? 'checked':''}catch(_){return ''}})()} /> <span style="font-size:0.85rem;color:var(--muted);">Quitar alerta</span></label>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        modal.style.display = 'flex';
+        const close = document.getElementById('pd-close');
+        const onClose = ()=>{ modal.style.display='none'; close.removeEventListener('click', onClose); };
+        close.addEventListener('click', onClose);
+        modal.addEventListener('click', (e)=>{ if (e.target === modal) onClose(); });
+      }
+
+      // Si venimos de showCreateProductForm, abrir form prellenado
+      try{
+        const initJson = localStorage.getItem('createProductInitial');
+        if(initJson){
+          const initial = JSON.parse(initJson);
+          localStorage.removeItem('createProductInitial');
+          // abrir form con datos
+          showProductForm(initial);
+        }
+      }catch(e){ /* ignore */ }
+
+      // Escuchar petición externa para abrir edición de un producto concreto
+      document.addEventListener('openProductEdit', (ev)=>{
+        try{
+          const id = ev.detail && ev.detail.id;
+          if (!id) return;
+          const item = products.find(p=>String(p.id)===String(id));
+          if (item) {
+            showProductForm(item);
+          }
+        }catch(_){ }
+      });
+
+      // Delete handler
+      async function onDelete(e){
+        const tr = e.target.closest('tr');
+        const id = tr.dataset.id;
+        if (!confirm('¿Borrar producto #' + id + '?')) return;
+        try {
+          const res = (window.API && window.API.del) ? await window.API.del(`/productos/${id}`) : await fetch(`/productos/${id}`, {method:'DELETE'});
+          if (!res.ok) throw new Error('Error borrando');
+          products = products.filter(p=>String(p.id)!==String(id));
+          applyFilters();
+        } catch (err) {
+          alert('No se pudo borrar: '+err.message);
+        }
+      }
+
+      // Edit handler: populate form with item data
+      function onEdit(e){
+        const tr = e.target.closest('tr');
+        const id = tr.dataset.id;
+        const item = products.find(p=>String(p.id)===String(id));
+        if (!item) return;
+        showProductForm(item);
+      }
+
+      // Delegación de clics para botones Ver/Editar/Borrar (compatible con Simple-DataTables)
+      listEl.addEventListener('click', (ev)=>{
+        const detailsBtn = ev.target.closest && ev.target.closest('.js-details');
+        if (detailsBtn) {
+          ev.preventDefault();
+          const tr = ev.target.closest('tr');
+          if (!tr) return;
+          const id = tr.getAttribute('data-id');
+          const p = products.find(x=>String(x.id)===String(id));
+          if (!p) return;
+          openDetailsModal(p);
+          return;
+        }
+        const delBtn = ev.target.closest && ev.target.closest('.js-delete');
+        if (delBtn) { ev.preventDefault(); return onDelete(ev); }
+        const editBtn = ev.target.closest && ev.target.closest('.js-edit');
+        if (editBtn) { ev.preventDefault(); return onEdit(ev); }
+      });
+
+      // manejar checkbox de supresión (delegado)
+      listEl.addEventListener('change', (ev)=>{
+        const cb = ev.target.closest && ev.target.closest('.suppress-alert-checkbox');
+        if (!cb) return;
+        const id = cb.getAttribute('data-id');
+        let map = {};
+        try { map = JSON.parse(localStorage.getItem('suppressAlerts') || '{}'); } catch(e) { map = {}; }
+        if (cb.checked) map[String(id)] = true; else delete map[String(id)];
+        localStorage.setItem('suppressAlerts', JSON.stringify(map));
+
+        // actualizar clase de la fila
+        const tr = listEl.querySelector(`tr[data-id="${id}"]`);
+        if (tr) {
+          const p = products.find(x=>String(x.id)===String(id));
+          const hasMin = typeof p.stockMinimo !== 'undefined' && p.stockMinimo !== null;
+          const isBelow = hasMin ? (Number(p.stock) < Number(p.stockMinimo)) : false;
+          if (isBelow && !cb.checked) tr.classList.add('row-alert'); else tr.classList.remove('row-alert');
+        }
+      });
+
+    })();
+  </script>
+</section>

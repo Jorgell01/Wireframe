@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro | Proyecto</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../assets/css/login.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <img src="../assets/img/logos/LOGO CIFP VIRGEN DE CANDELARIA.png" alt="Logo" class="logo">
+      <h1>Registro</h1>
+      <form id="registerForm">
+        <input type="text" id="r-username" placeholder="Usuario" required>
+        <input type="email" id="r-email" placeholder="Email (opcional)">
+        <input type="password" id="r-password" placeholder="Contraseña" required>
+        <input type="password" id="r-password2" placeholder="Repetir contraseña" required>
+        <button type="submit">Crear cuenta</button>
+      </form>
+      <p class="register-link">¿Tienes cuenta? <a href="login.html">Inicia sesión</a></p>
+      <p id="r-error" class="error-message"></p>
+    </div>
+  </div>
+
+  <script src="../assets/js/api.js"></script>
+  <script src="../assets/js/register.js"></script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+/* ===== HEADER / TOPBAR ===== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  /* Use a light topbar so dark logo artwork remains legible */
+  background: var(--cream-weak);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+.topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar__logo {
+  height: 42px;
+  object-fit: contain;
+}
+
+.topbar__title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-on-dark);
+}
+
+.topbar__center {
+  display: flex;
+  justify-content: center;
+}
+
+.topbar__search {
+  width: 100%;
+  max-width: 420px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.06);
+  /* Invert input color to keep it visible on the now-light topbar */
+  background: var(--surface-dark);
+  color: var(--text-on-dark);
+}
+
+.topbar__search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: flex-end;
+}
+
+.topbar__user {
+  color: var(--text-on-cream);
+  font-weight: 600;
+}
+
+/* =========== FOOTER =========== */
+.app-footer {
+  border-top: 1px solid var(--border);
+  /* match header with a light footer so logo/branding stays consistent */
+  background: var(--cream-weak);
+  padding: 12px 16px;
+  position: sticky;
+  bottom: 0;
+}
+
+.app-footer__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-on-cream);
+  font-size: .95rem;
+}
+
+.app-footer__link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.app-footer__link:hover {
+  text-decoration: underline;
+}
+
+/* ======== LAYOUT GENERAL DASHBOARD ======== */
+.dashboard-container {
+  display: flex;
+  height: 100vh;
+  /* dejar transparente para heredar el fondo crema global */
+  background-color: transparent;
+}
+
+/* ======== SIDEBAR ======== */
+#sidebar {
+  width: 240px;
+  /* Move the dark blue background from header into the navbar (sidebar) */
+  background-color: var(--surface-dark);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--text-on-dark);
+}
+
+#sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#sidebar li {
+  margin-bottom: 15px;
+}
+
+/* enlaces del sidebar (SPA) */
+.sidebar__link {
+  display: block;
+  color: var(--text-on-dark); /* light text over dark sidebar */
+  text-decoration: none;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  border: 1px solid transparent;
+}
+
+.sidebar__link:hover {
+  color: var(--accent);
+  /* subtle light overlay for hover on dark background */
+  background: rgba(255,255,255,0.03);
+  border-color: transparent;
+}
+
+/* enlace activo según ruta */
+.sidebar__link.is-active {
+  background: var(--accent);
+  border-color: var(--accent-dark);
+  color: #fff;
+}
+
+/* ======== CONTENIDO PRINCIPAL ======== */
+.dashboard-content {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
+
+.dashboard-content h1 {
+  font-size: 1.8em;
+  margin-bottom: 20px;
+}
+
+/* Cards de la home del dashboard */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background-color: var(--cream);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.card h3 {
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+  color: var(--accent);
+}
+
+.card p {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin: 0;
+  color: var(--text-on-cream);
+}
+
+/* ======== TABLAS (productos, proveedores…) ======== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: var(--cream);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  color: var(--text-on-cream);
+}
+
+.table th { background: var(--surface-dark); font-weight: 600; color: var(--text-on-dark); }
+
+.table tr:hover { background: var(--cream-weak); }
+
+/* Fila con alerta de stock bajo */
+.row-alert { background: #fee2e2 !important; color: #7f1d1d; }
+
+/* ======== LISTAS (categorías, etc.) ======== */
+.list {
+  margin-top: 16px;
+  list-style: none;
+  padding: 0;
+}
+
+.list-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--cream);
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  color: var(--text-on-cream);
+}
+
+/* ======== PEQUEÑOS TEXTOS / UTILIDADES ======== */
+.dashboard-content h2 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 1.4rem;
+}
+
+.card-link {
+  cursor: pointer;
+}
+
+.card-link:hover {
+  transform: translateY(-5px);
+  outline: 1px solid var(--accent-dark);
+}
+
+/* anchors used as card links should be block-level and inherit card styles */
+.card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.card-link .card { transition: transform 0.2s; }
+.card-link:hover .card { transform: translateY(-5px); outline: 1px solid var(--accent-dark); }
+
+.product-form-wrapper {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+}
+
+.product-form-wrapper h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+/* Componentes: estilos consolidados (topbar / sidebar / footer) definidos arriba. */
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.form-row label {
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.form-row input,
+.form-row select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--cream-weak);
+  color: var(--text-on-cream);
+}
+
+.form-row input:focus,
+.form-row select:focus { outline: none; border-color: var(--accent); }
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary:hover { background: var(--accent-dark); }
+
+.btn-secondary {
+  background: var(--surface-dark);
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  color: var(--text-on-dark);
+  cursor: pointer;
+}
+
+.btn-secondary:hover { background: #0b1220; }
+
+.btn-small {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  margin-right: 4px;
+}
+
+.btn-edit { background: var(--success); color: #0f172a; }
+
+.btn-edit:hover { background: #15803d; }
+
+.btn-delete { background: var(--danger); color: #fff; }
+
+.btn-delete:hover { background: #dc2626; }
+
+/* Styles for category list buttons (used in views/categorias.html) */
+.btn-edit-cat,
+.btn-delete-cat {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-edit-cat { background: var(--success); color: #0f172a; }
+.btn-edit-cat:hover { background: #15803d; }
+
+.btn-delete-cat { background: var(--danger); color: #fff; }
+.btn-delete-cat:hover { background: #dc2626; }

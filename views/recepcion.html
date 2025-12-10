@@ -1,0 +1,157 @@
+<section>
+    <h2>📥 Recepciones</h2>
+
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
+        <div>
+            <button id="tabManual" class="btn-secondary">Manual</button>
+            <button id="tabCheck" class="btn-secondary">Comprobación (Pedido final)</button>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+            <button id="focusScanner" class="btn-secondary">Foco escáner</button>
+        </div>
+    </div>
+
+    <div id="tabContent">
+        <div id="panelManual">
+            <div class="product-form-wrapper">
+                <form id="recepcionForm">
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                        <div class="form-row" style="flex:1;min-width:180px;">
+                            <label>Producto</label>
+                            <select id="recepcionProducto"></select>
+                        </div>
+
+                        <div class="form-row" style="min-width:180px;">
+                            <label>Proveedor</label>
+                            <select id="recepcionProveedor"></select>
+                        </div>
+
+                        <div class="form-row" style="width:120px;">
+                            <label>Cantidad</label>
+                            <input id="recepcionCantidad" type="number" min="1" value="1" />
+                        </div>
+
+                        <div style="display:flex;align-items:flex-end;gap:8px;">
+                            <button id="recepcionAddLine" type="button" class="btn-secondary">Agregar línea</button>
+                        </div>
+                    </div>
+
+                    <div id="recepcionLinesArea" style="margin-top:12px;"></div>
+
+                    <div class="form-actions" style="margin-top:8px;">
+                        <button id="recepcionSubmit" class="btn-primary">Registrar recepciones</button>
+                        <button id="recepcionClear" type="button" class="btn-secondary">Limpiar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="panelCheck" style="display:none;">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+                <div style="min-width:280px;">
+                    <label class="form-row"><span style="font-weight:600">Pedido final</span>
+                        <select id="pedidoFinalSel"><option value="">Cargando...</option></select>
+                    </label>
+                </div>
+                <div style="min-width:220px;">
+                    <label class="form-row"><span style="font-weight:600">Modo escaneo</span>
+                        <select id="checkScanMode"><option value="inc">Incrementar qty</option><option value="mark">Marcar discrepancia</option></select>
+                    </label>
+                </div>
+                <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                    <button id="btnLoadExpected" class="btn-primary">Cargar líneas esperadas</button>
+                    <button id="btnSaveReception" class="btn-primary">Guardar recepción</button>
+                </div>
+            </div>
+
+            <div id="expectedInfo" style="margin-bottom:8px;color:var(--muted)"></div>
+            <div id="expectedArea"><p id="expectedPlaceholder">Selecciona un pedido final y pulsa "Cargar líneas esperadas".</p></div>
+        </div>
+    </div>
+
+    <h3>Historial de recepciones</h3>
+    <div id="recepcionLogArea"></div>
+
+    <div id="toastContainer" aria-live="polite" style="position:fixed;right:16px;bottom:16px;z-index:9999"></div>
+
+    <script>
+        (async function(){
+            const tabManual = document.getElementById('tabManual');
+            const tabCheck = document.getElementById('tabCheck');
+            const panelManual = document.getElementById('panelManual');
+            const panelCheck = document.getElementById('panelCheck');
+            const focusBtn = document.getElementById('focusScanner');
+
+            function showToast(message, {timeout=3000, actionLabel, onAction} = {}){
+                const el = document.createElement('div'); el.style.background='#222'; el.style.color='#fff'; el.style.padding='10px 12px'; el.style.marginTop='8px'; el.style.borderRadius='6px'; el.style.boxShadow='0 6px 18px rgba(0,0,0,0.2)'; el.style.display='flex'; el.style.alignItems='center'; el.style.gap='12px'; const msg=document.createElement('div'); msg.textContent=message; msg.style.flex='1'; el.appendChild(msg); if(actionLabel && typeof onAction==='function'){ const btn=document.createElement('button'); btn.className='btn-small'; btn.textContent=actionLabel; btn.addEventListener('click', ()=>{ try{ onAction(); }catch(e){console.error(e);} el.remove(); }); el.appendChild(btn); } document.getElementById('toastContainer').appendChild(el); setTimeout(()=>el.remove(), timeout);
+            }
+
+            tabManual.addEventListener('click', ()=>{ panelManual.style.display='block'; panelCheck.style.display='none'; });
+            tabCheck.addEventListener('click', ()=>{ panelManual.style.display='none'; panelCheck.style.display='block'; });
+            focusBtn.addEventListener('click', ()=>{ try{ if(typeof window.focusBarcodeInput === 'function') window.focusBarcodeInput(); else showToast('Scanner helper no disponible'); }catch(e){console.error(e);} });
+
+            // Manual
+            const productoSel = document.getElementById('recepcionProducto');
+            const cantidadInput = document.getElementById('recepcionCantidad');
+            const form = document.getElementById('recepcionForm');
+            const logArea = document.getElementById('recepcionLogArea');
+
+            async function loadProducts(){ try{ const res = (window.API && window.API.get) ? await window.API.get('/productos') : await fetch('/productos'); if(!res.ok) throw new Error('API no disponible'); const productos = await res.json(); productoSel.innerHTML = productos.map(p=>`<option value="${p.id}">${p.id} — ${p.nombre}</option>`).join(''); return productos; }catch(e){ productoSel.innerHTML = '<option value="">(API no disponible)</option>'; return []; } }
+
+            async function loadProviders(){ try{ const res = (window.API && window.API.get) ? await window.API.get('/proveedores') : await fetch('/proveedores'); if(!res.ok) throw new Error('API no disponible'); const provs = await res.json(); const sel = document.getElementById('recepcionProveedor'); if(sel) sel.innerHTML = provs.map(p=>`<option value="${p.id}">${p.id} — ${p.nombre}</option>`).join(''); return provs; }catch(e){ const sel = document.getElementById('recepcionProveedor'); if(sel) sel.innerHTML = '<option value="">(API no disponible)</option>'; return []; } }
+
+            function renderLogTable(logs){ if(!logs || !logs.length) return '<p>No hay registros.</p>'; const rows = logs.map(l=>`<tr><td>${l.date}</td><td>${l.productId}</td><td>${l.productName||'-'}</td><td>${l.providerName||l.proveedor||'-'}</td><td>${l.qty}</td><td>${l.type||l.tipo||'recepción'}</td></tr>`).join(''); return `<table class="table"><thead><tr><th>Fecha</th><th>Producto</th><th>Nombre</th><th>Proveedor</th><th>Cantidad</th><th>Tipo</th></tr></thead><tbody>${rows}</tbody></table>`; }
+
+            function loadLog(){ let logs = []; try{ logs = JSON.parse(localStorage.getItem('recepcionLog') || '[]'); }catch(e){ logs=[]; } try{ const prev = JSON.parse(localStorage.getItem('recepciones_previas') || '[]'); if(Array.isArray(prev)){ prev.forEach(r=>{ (r.lines||[]).forEach(l=> logs.unshift({ date: r.date, productId: l.productId, productName: l.productName, qty: l.qtyRecibida||l.qty||0, providerName: r.proveedor||'', type: r.pedidoFinalId ? 'recepción previa' : 'recepción previa' })); }); } }catch(e){} logArea.innerHTML = renderLogTable(logs); }
+
+            const productos = await loadProducts();
+            const proveedores = await loadProviders();
+            loadLog();
+
+            // pending lines manual
+            let pending = [];
+            const linesArea = document.getElementById('recepcionLinesArea');
+
+            function renderPending(){ if(!pending.length){ linesArea.innerHTML = '<p>No hay líneas añadidas.</p>'; return; } const rows = pending.map((ln,i)=>`<tr data-i="${i}"><td>${ln.productId}</td><td>${ln.name}</td><td>${ln.providerName||'-'}</td><td>${ln.qty}</td><td><button class="btn-small btn-delete-line" data-i="${i}">Eliminar</button></td></tr>`).join(''); linesArea.innerHTML = `<table class="table"><thead><tr><th>Producto</th><th>Nombre</th><th>Proveedor</th><th>Cantidad</th><th></th></tr></thead><tbody>${rows}</tbody></table>`; linesArea.querySelectorAll('.btn-delete-line').forEach(b=>b.addEventListener('click', (e)=>{ const i=Number(e.target.getAttribute('data-i')); pending.splice(i,1); renderPending(); })); }
+
+            document.getElementById('recepcionAddLine').addEventListener('click', ()=>{ const id = productoSel.value; const name = productoSel.options[productoSel.selectedIndex]?.text || ''; const provId = document.getElementById('recepcionProveedor').value; const provName = document.getElementById('recepcionProveedor').options[document.getElementById('recepcionProveedor').selectedIndex]?.text || ''; const qty = Math.max(0, parseInt(cantidadInput.value) || 0); if(!id || qty <= 0) return showToast('Selecciona producto, proveedor y cantidad válida'); const existing = pending.find(x=>String(x.productId)===String(id) && String(x.providerId)===String(provId)); if(existing){ existing.qty += qty; } else { pending.push({ productId: id, name: name, providerId: provId, providerName: provName, qty }); } renderPending(); });
+
+            document.getElementById('recepcionClear').addEventListener('click', ()=>{ pending = []; renderPending(); });
+
+            // scanner helper
+            async function findProductByCode(code){ try{ const res = (window.API && window.API.get) ? await window.API.get(`/productos?codigo=${encodeURIComponent(code)}`) : await fetch(`/productos?codigo=${encodeURIComponent(code)}`); if(!res.ok) return null; const arr = await res.json(); return arr[0] || null; }catch(e){ console.error('findProductByCode', e); return null; } }
+
+            let expected = null;
+
+            async function onBarcodeScannedUnified(code){ if(expected && Array.isArray(expected.lines) && expected.lines.length){ const prod = await findProductByCode(code); if(!prod){ showToast('Código no encontrado: '+code); return; } const idx = expected.lines.findIndex(l=>String(l.productId)===String(prod.id) || String(l.productName)===String(prod.nombre)); if(idx === -1){ expected.lines.push({ productId: prod.id, productName: prod.nombre, qtyEsperada: 0, qtyRecibida: 1, discrepancy: true }); } else { expected.lines[idx].qtyRecibida = (Number(expected.lines[idx].qtyRecibida) || 0) + 1; expected.lines[idx].discrepancy = Number(expected.lines[idx].qtyRecibida) !== Number(expected.lines[idx].qtyEsperada); } renderExpected(); showToast('Comprobación: ' + prod.nombre); return; } const p = await findProductByCode(code); if(p){ const provId = document.getElementById('recepcionProveedor').value; const provName = document.getElementById('recepcionProveedor').options[document.getElementById('recepcionProveedor').selectedIndex]?.text || ''; const existing = pending.find(x=>String(x.productId)===String(p.id) && String(x.providerId)===String(provId)); if(existing){ existing.qty = Number(existing.qty||0) + 1; } else { pending.push({ productId: p.id, name: p.nombre, providerId: provId, providerName: provName, qty: 1 }); } renderPending(); showToast(p.nombre + ' añadido'); } else { if(typeof showCreateProductForm === 'function') showCreateProductForm({ codigo: code }); else showToast('Producto no encontrado'); } }
+
+            window.addEventListener('barcodeScanned', (e)=>{ onBarcodeScannedUnified(e.detail.code); });
+            window.onBarcodeScanned = async function(code){ await onBarcodeScannedUnified(code); };
+
+            // submit manual
+            form.addEventListener('submit', async (ev)=>{ ev.preventDefault(); if(!pending.length) return showToast('Añade al menos una línea antes de enviar'); try{ for(const ln of pending){ const id = ln.productId; const qty = ln.qty; const provId = ln.providerId; const provName = ln.providerName; const resP = (window.API && window.API.get) ? await window.API.get(`/productos/${id}`) : await fetch(`/productos/${id}`); if(!resP.ok){ console.warn('Producto no encontrado', id); continue; } const p = await resP.json(); const newStock = (Number(p.stock) || 0) + qty; const updated = { ...p, stock: newStock }; const res = (window.API && window.API.put) ? await window.API.put(`/productos/${id}`, updated) : await fetch(`/productos/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)}); if(!res.ok){ console.warn('Error actualizando', id); continue; } const entry = { date: new Date().toLocaleString(), productId: p.id, productName: p.nombre, providerId: provId, providerName: provName, qty, type: 'recepción' }; let logs = []; try{ logs = JSON.parse(localStorage.getItem('recepcionLog') || '[]'); }catch(e){ logs = []; } logs.unshift(entry); localStorage.setItem('recepcionLog', JSON.stringify(logs)); } pending = []; renderPending(); loadLog(); showToast('Recepciones registradas'); }catch(err){ console.error(err); showToast('Error procesando recepciones: '+err.message); } });
+
+            // Check panel
+            const pedidoSel = document.getElementById('pedidoFinalSel');
+            const btnLoadExpected = document.getElementById('btnLoadExpected');
+            const btnSaveReception = document.getElementById('btnSaveReception');
+            const expectedArea = document.getElementById('expectedArea');
+            const expectedInfo = document.getElementById('expectedInfo');
+
+            async function loadPedidoFinales(){ try{ const res = (window.API && window.API.get) ? await window.API.get('/pedido_finales') : await fetch('/pedido_finales'); if(!res.ok) throw new Error('No API'); return await res.json(); }catch(e){ console.warn('pedido_finales not available', e); return []; } }
+            async function getPedidoFinal(id){ try{ const res = (window.API && window.API.get) ? await window.API.get(`/pedido_finales/${id}`) : await fetch(`/pedido_finales/${id}`); if(!res.ok) return null; return await res.json(); }catch(e){ console.warn('getPedidoFinal', e); return null; } }
+
+            function renderExpected(){ if(!expected){ expectedArea.innerHTML = '<p>No hay líneas cargadas.</p>'; return; } expectedInfo.textContent = `Pedido final: ${expected.id} — ${expected.descripcion || ''}`; const table = document.createElement('table'); table.className='table'; table.innerHTML = `<thead><tr><th>Producto</th><th>Esperado</th><th>Recibido</th><th></th></tr></thead>`; const tbody = document.createElement('tbody'); expected.lines.forEach((ln,i)=>{ const tr=document.createElement('tr'); tr.dataset.i=i; tr.innerHTML = `<td>${ln.productName||ln.productId}</td><td>${ln.qtyEsperada}</td><td><input type="number" value="${ln.qtyRecibida||0}" min="0" style="width:70px" data-field="qtyRecibida" /></td><td>${ln.discrepancy?'<strong style="color:#b91c1c">DISCREPANCIA</strong>':''}</td>`; tbody.appendChild(tr); }); table.appendChild(tbody); expectedArea.innerHTML=''; expectedArea.appendChild(table); expectedArea.querySelectorAll('input').forEach(inp=>{ inp.addEventListener('change', (ev)=>{ const tr = ev.target.closest('tr'); const idx = Number(tr.dataset.i); const field = ev.target.getAttribute('data-field'); expected.lines[idx][field] = (field==='qtyRecibida')? Number(ev.target.value||0) : ev.target.value; expected.lines[idx].discrepancy = Number(expected.lines[idx].qtyRecibida||0) !== Number(expected.lines[idx].qtyEsperada||0); renderExpected(); }); }); }
+
+            const pedidos = await loadPedidoFinales();
+            pedidoSel.innerHTML = '<option value="">-- Selecciona pedido final --</option>' + pedidos.map(p=>`<option value="${p.id}">${p.id} — ${p.descripcion||p.fecha||''}</option>`).join('');
+
+            btnLoadExpected.addEventListener('click', async ()=>{ const id = pedidoSel.value; if(!id){ showToast('Selecciona un pedido primero'); return; } const p = await getPedidoFinal(id); if(!p){ showToast('No se encontró el pedido en la API'); expected=null; renderExpected(); return; } expected = { id: p.id, descripcion: p.descripcion||p.fecha||'', lines: (p.lineas||[]).map(l=>({ productId: l.productId, productName: l.productName||l.nombre||l.productId, qtyEsperada: Number(l.qtySolicitada||l.qty||0), qtyRecibida: 0, discrepancy:false })) }; renderExpected(); showToast('Líneas esperadas cargadas'); });
+
+            async function postReception(obj){ try{ const res = (window.API && window.API.post) ? await window.API.post('/recepciones_previas', obj) : await fetch('/recepciones_previas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj) }); if(!res.ok) throw new Error('post failed'); return await res.json(); }catch(e){ console.warn('postReception failed', e); return null; } }
+
+            btnSaveReception.addEventListener('click', async ()=>{ if(!expected) return showToast('No hay datos a guardar'); const reception = { pedidoFinalId: expected.id, date: new Date().toLocaleString(), lines: expected.lines.map(l=>({ productId: l.productId, productName: l.productName, qtyEsperada: l.qtyEsperada, qtyRecibida: l.qtyRecibida||0, discrepancy: !!l.discrepancy })) }; const posted = await postReception(reception); if(posted){ showToast('Recepción guardada en la API'); } else { const key='recepciones_previas'; let arr=[]; try{ arr = JSON.parse(localStorage.getItem(key) || '[]'); }catch(e){ arr = []; } arr.unshift(reception); localStorage.setItem(key, JSON.stringify(arr)); showToast('Recepción guardada localmente'); } loadLog(); });
+
+        })();
+    </script>
+</section>

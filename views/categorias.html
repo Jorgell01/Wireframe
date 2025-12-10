@@ -1,0 +1,142 @@
+<section>
+  <h2>Categorías</h2>
+
+  <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:12px;">
+    <div style="flex:1">
+      <p id="categorias-status">Cargando categorías...</p>
+    </div>
+    <div>
+      <button id="btnCreateCategory" class="btn-primary">Crear Categoría</button>
+    </div>
+  </div>
+
+  <div id="category-form-area"></div>
+  <div id="categorias-list"></div>
+
+  <script>
+    (async function(){
+      const listEl = document.getElementById('categorias-list');
+      const status = document.getElementById('categorias-status');
+      const formArea = document.getElementById('category-form-area');
+      const createBtn = document.getElementById('btnCreateCategory');
+
+      function renderCategoryItem(c){
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        li.dataset.id = c.id;
+        li.innerHTML = `<span class="category-text">${c.id} — ${c.nombre||c.name}${c.descripcion ? ' — '+c.descripcion : ''}</span> <div style="display:inline-flex;gap:6px;margin-left:8px;"><button class="btn-edit" data-id="${c.id}">Editar</button><button class="btn-delete" data-id="${c.id}">Borrar</button></div>`;
+        return li;
+      }
+
+      async function loadCategories(){
+        try {
+          const loader = (window.API && window.API.get) ? window.API.get('/categorias') : fetch('/categorias');
+          const res = await loader;
+          if (!res.ok) throw new Error('No hay API disponible');
+          const data = await res.json();
+          status.textContent = '';
+          if (!data.length) { status.textContent = 'No hay categorías.'; }
+          const ul = document.createElement('ul'); ul.className = 'list';
+          data.forEach(c=> ul.appendChild(renderCategoryItem(c)));
+          listEl.innerHTML = ''; listEl.appendChild(ul);
+        } catch (e) {
+          status.textContent = 'No se ha podido conectar con la API. Ejemplo:';
+          listEl.innerHTML = `
+            <ul class="list">
+              <li class="list-item">1 — Alimentación</li>
+              <li class="list-item">2 — Electrónica</li>
+              <li class="list-item">3 — Textil</li>
+            </ul>`;
+          console.warn(e);
+        }
+      }
+
+      // delegate edit/delete for categories
+      listEl.addEventListener('click', async (ev)=>{
+        const editBtn = ev.target.closest('.btn-edit');
+        const delBtn = ev.target.closest('.btn-delete');
+        if (editBtn){
+          const id = editBtn.dataset.id;
+          let cat = null;
+          try {
+            const res = (window.API && window.API.get) ? await window.API.get(`/categorias/${id}`) : await fetch(`/categorias/${id}`);
+            cat = res.ok ? await res.json() : null;
+          } catch(e){ cat = null; }
+          if (!cat){
+            const li = editBtn.closest('li');
+            const txt = li.querySelector('.category-text').textContent || '';
+            const parts = txt.split('—').map(s=>s.trim());
+            cat = { id:id, nombre: parts[1]||'', descripcion: parts[2]||'' };
+          }
+          formArea.innerHTML = '';
+          const wrapper = document.createElement('div'); wrapper.className='product-form-wrapper';
+          wrapper.innerHTML = `
+            <h3>Editar Categoría</h3>
+            <div class="form-row"><label>Nombre<input id="cat-name-edit" value="${(cat.nombre||cat.name||'').replace(/"/g,'&quot;')}" /></label></div>
+            <div class="form-row"><label>Descripción<input id="cat-desc-edit" value="${(cat.descripcion||'').replace(/"/g,'&quot;')}" /></label></div>
+            <div style="display:flex;gap:8px;margin-top:8px;"><button id="cat-save-edit" class="btn-primary">Guardar</button><button id="cat-cancel-edit" class="btn-secondary">Cancelar</button></div>
+          `;
+          formArea.appendChild(wrapper);
+          // smooth scroll and focus
+          try { wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_){ }
+          try { document.getElementById('cat-name-edit').focus(); } catch(_){ }
+          document.getElementById('cat-cancel-edit').addEventListener('click', ()=>{ formArea.innerHTML=''; });
+          document.getElementById('cat-save-edit').addEventListener('click', async ()=>{
+            const payload = { nombre: document.getElementById('cat-name-edit').value.trim(), descripcion: document.getElementById('cat-desc-edit').value.trim() };
+            try {
+              const res = (window.API && window.API.put) ? await window.API.put(`/categorias/${id}`, payload) : await fetch(`/categorias/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+              if (!res.ok) throw new Error('Error actualizando categoría');
+              const updated = await res.json();
+              const li = listEl.querySelector(`li[data-id="${id}"]`);
+              if (li) li.querySelector('.category-text').textContent = `${updated.id} — ${updated.nombre||updated.name}${updated.descripcion ? ' — '+updated.descripcion : ''}`;
+              formArea.innerHTML = '';
+            } catch(err){ alert('Error: '+err.message); }
+          });
+        }
+        if (delBtn){
+          const id = delBtn.dataset.id;
+          if (!confirm('¿Borrar categoría #' + id + '?')) return;
+          try {
+            const res = (window.API && window.API.del) ? await window.API.del(`/categorias/${id}`) : await fetch(`/categorias/${id}`, {method:'DELETE'});
+            if (!res.ok) throw new Error('Error borrando categoría');
+            const li = listEl.querySelector(`li[data-id="${id}"]`);
+            if (li) li.remove();
+          } catch(err){ alert('Error: '+err.message); }
+        }
+      });
+
+      // create new category
+      createBtn.addEventListener('click', ()=>{
+        formArea.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'product-form-wrapper';
+        wrapper.innerHTML = `
+          <h3>Nueva Categoría</h3>
+          <div class="form-row"><label>Nombre<input id="cat-name" /></label></div>
+          <div class="form-row"><label>Descripción<input id="cat-desc" /></label></div>
+          <div style="display:flex;gap:8px;margin-top:8px;"><button id="cat-save" class="btn-primary">Crear</button><button id="cat-cancel" class="btn-secondary">Cancelar</button></div>
+        `;
+        formArea.appendChild(wrapper);
+        // smooth scroll and focus
+        try { wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_){ }
+        try { document.getElementById('cat-name').focus(); } catch(_){ }
+        document.getElementById('cat-cancel').addEventListener('click', ()=>{ formArea.innerHTML=''; });
+        document.getElementById('cat-save').addEventListener('click', async ()=>{
+          const payload = { nombre: document.getElementById('cat-name').value.trim(), descripcion: document.getElementById('cat-desc').value.trim() };
+          try {
+            const res = (window.API && window.API.post) ? await window.API.post('/categorias', payload) : await fetch('/categorias', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            if (!res.ok) throw new Error('Error creando categoría');
+            const created = await res.json();
+            const ul = listEl.querySelector('.list') || (function(){ const u=document.createElement('ul'); u.className='list'; listEl.innerHTML=''; listEl.appendChild(u); return u; })();
+            ul.insertBefore(renderCategoryItem(created), ul.firstChild);
+            formArea.innerHTML='';
+          } catch (err) { alert('Error: '+err.message); }
+        });
+      });
+
+      // initial load
+      loadCategories();
+
+    })();
+  </script>
+</section>

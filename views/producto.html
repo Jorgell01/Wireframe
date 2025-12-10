@@ -1,0 +1,102 @@
+<section>
+  <button id="backBtn" class="btn-secondary" style="margin-bottom:12px">← Volver</button>
+  <div id="producto-content" style="display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start;"></div>
+
+  <script>
+    (async function(){
+      const content = document.getElementById('producto-content');
+      const backBtn = document.getElementById('backBtn');
+      backBtn.addEventListener('click', ()=>{ location.hash = '#/productos'; });
+
+      function getIdFromHash(){
+        const h = location.hash || '';
+        const m = h.match(/^#\/producto\/(.+)$/);
+        return m ? decodeURIComponent(m[1]) : null;
+      }
+
+      const id = getIdFromHash();
+      if (!id){
+        content.innerHTML = '<div style="padding:12px;background:#fff3f2;border-radius:8px;color:#7a1f0d;">Producto no especificado</div>';
+        return;
+      }
+
+      async function fetchProducto(){
+        try{
+          const loader = (window.API && window.API.get) ? window.API.get(`/productos/${id}`) : fetch(`/productos/${id}`);
+          const res = await loader;
+          if (!res.ok) throw new Error('No encontrado');
+          return await res.json();
+        }catch(e){
+          return null;
+        }
+      }
+
+      async function fetchList(path){
+        try{
+          const loader = (window.API && window.API.get) ? window.API.get(path) : fetch(path);
+          const res = await loader;
+          if (!res.ok) return [];
+          return await res.json();
+        }catch(_){ return []; }
+      }
+
+      const [p, categorias, proveedores] = await Promise.all([
+        fetchProducto(),
+        fetchList('/categorias'),
+        fetchList('/proveedores')
+      ]);
+      if (!p){
+        content.innerHTML = '<div style="padding:12px;background:#fff3f2;border-radius:8px;color:#7a1f0d;">No se pudo cargar el producto</div>';
+        return;
+      }
+
+      const imgUrl = p.imagenUrl || p.imageUrl || '';
+      const categoriaNombre = (p.categoria && p.categoria.nombre) || (Array.isArray(categorias)? categorias.find(c=>String(c.id)===String(p.categoriaId))?.nombre : '') || '';
+      const proveedorNombre = (p.proveedor && p.proveedor.nombre) || (Array.isArray(proveedores)? proveedores.find(r=>String(r.id)===String(p.proveedorId))?.nombre : '') || '';
+
+      content.innerHTML = `
+        <div>
+          ${imgUrl ? `<img src="${imgUrl}" alt="${p.nombre||p.name||''}" style="width:100%;max-width:300px;height:auto;border-radius:10px;object-fit:cover;" />` : '<div style="width:100%;max-width:300px;height:200px;background:#eee;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#777;">Sin imagen</div>'}
+        </div>
+        <div>
+          <h2 style="margin:0 0 8px 0;">${p.nombre||p.name||'Sin nombre'}</h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+            <div><strong>Categoría:</strong> ${categoriaNombre || '-'}</div>
+            <div><strong>Proveedor:</strong> ${proveedorNombre || '-'}</div>
+            <div><strong>Código:</strong> ${p.codigo || '-'}</div>
+            <div><strong>Peso:</strong> ${(p.peso ?? '')} ${p.unidadPeso || ''}</div>
+            <div><strong>Precio:</strong> ${(p.precio ?? p.price ?? '-')}${p.unidadPrecio ? ' ' + p.unidadPrecio : ''}</div>
+            <div><strong>Stock mínimo:</strong> ${typeof p.stockMinimo !== 'undefined' && p.stockMinimo !== null ? p.stockMinimo : '-'}</div>
+            <div><strong>Stock actual:</strong> ${p.stock ?? '-'}</div>
+            <div><strong>Descripción:</strong> ${p.descripcion || p.description || '-'}</div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:8px;">
+            <button id="editBtn" class="btn-primary">Editar</button>
+            <button id="deleteBtn" class="btn-delete">Borrar</button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('editBtn').addEventListener('click', ()=>{
+        try { localStorage.setItem('openEditProductId', String(id)); } catch(_) {}
+        location.hash = '#/productos';
+        // Fallback: emitir evento tras navegar para abrir edición
+        setTimeout(()=>{
+          try{
+            const evt = new CustomEvent('openProductEdit', { detail: { id } });
+            document.dispatchEvent(evt);
+          }catch(_){ }
+        }, 120);
+      });
+
+      document.getElementById('deleteBtn').addEventListener('click', async ()=>{
+        if (!confirm('¿Borrar producto #' + id + '?')) return;
+        try{
+          const res = (window.API && window.API.del) ? await window.API.del(`/productos/${id}`) : await fetch(`/productos/${id}`, {method:'DELETE'});
+          if (!res.ok) throw new Error('Error borrando');
+          location.hash = '#/productos';
+        }catch(e){ alert('No se pudo borrar: '+ e.message); }
+      });
+    })();
+  </script>
+</section>

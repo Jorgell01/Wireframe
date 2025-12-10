@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Recepción previa | Proyecto</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../assets/css/dashboard.css">
+</head>
+<body>
+<section>
+  <h2>📦 Recepción previa de pedido final</h2>
+
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+    <div style="min-width:280px;">
+      <label class="form-row"><span style="font-weight:600">Pedido final</span>
+        <select id="pedidoFinalSel"><option value="">Cargando...</option></select>
+      </label>
+    </div>
+    <div style="min-width:220px;">
+      <label class="form-row"><span style="font-weight:600">Foco escáner</span>
+        <button id="focusScanner" class="btn-secondary">Fijar foco</button>
+      </label>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+      <button id="btnLoadExpected" class="btn-primary">Cargar líneas esperadas</button>
+      <button id="btnSaveReception" class="btn-primary">Guardar recepción</button>
+    </div>
+  </div>
+
+  <div id="expectedInfo" style="margin-bottom:8px;color:var(--muted)"></div>
+  <div id="expectedArea">
+    <p id="expectedPlaceholder">Selecciona un pedido final y pulsa "Cargar líneas esperadas".</p>
+  </div>
+
+  <h3>Registro de comprobación</h3>
+  <div id="checkArea"></div>
+
+  <h3>Historial de recepciones previas</h3>
+  <div id="receptionsLog"></div>
+
+  <!-- Toasts -->
+  <div id="toastContainer" aria-live="polite" style="position:fixed;right:16px;bottom:16px;z-index:9999"></div>
+
+  <script>
+    (async function(){
+      const pedidoSel = document.getElementById('pedidoFinalSel');
+      const expectedArea = document.getElementById('expectedArea');
+      const expectedInfo = document.getElementById('expectedInfo');
+      const btnLoadExpected = document.getElementById('btnLoadExpected');
+      const btnSaveReception = document.getElementById('btnSaveReception');
+      const focusScannerBtn = document.getElementById('focusScanner');
+      const checkArea = document.getElementById('checkArea');
+      const receptionsLog = document.getElementById('receptionsLog');
+      const toastContainer = document.getElementById('toastContainer');
+
+      // small toast helper
+      function showToast(message, {timeout=4000, actionLabel, onAction} = {}){
+        const el = document.createElement('div');
+        el.style.background = '#222'; el.style.color = '#fff'; el.style.padding = '10px 12px'; el.style.marginTop='8px'; el.style.borderRadius='6px'; el.style.boxShadow='0 6px 18px rgba(0,0,0,0.2)';
+        el.style.display='flex'; el.style.alignItems='center'; el.style.gap='12px';
+        const msg = document.createElement('div'); msg.textContent = message; msg.style.flex='1'; el.appendChild(msg);
+        if(actionLabel && typeof onAction === 'function'){
+          const btn = document.createElement('button'); btn.className='btn-small'; btn.textContent = actionLabel; btn.addEventListener('click', ()=>{ try{ onAction(); }catch(e){console.error(e);} if(el.parentNode) el.parentNode.removeChild(el); }); el.appendChild(btn);
+        }
+        toastContainer.appendChild(el);
+        setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); }, timeout);
+      }
+
+      // try load pedido_finales from API
+      async function loadPedidoFinales(){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get('/pedido_finales') : await fetch('/pedido_finales');
+          if(!res.ok) throw new Error('No API or empty');
+          const arr = await res.json();
+          return arr;
+        }catch(e){
+          console.warn('pedido_finales not available', e);
+          return [];
+        }
+      }
+
+      // fetch single pedido final
+      async function getPedidoFinal(id){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get(`/pedido_finales/${id}`) : await fetch(`/pedido_finales/${id}`);
+          if(!res.ok) return null;
+          return await res.json();
+        }catch(e){ console.warn('getPedidoFinal', e); return null; }
+      }
+
+      // reception persistence (localStorage fallback)
+      function saveReceptionLocal(obj){
+        const key = 'recepciones_previas';
+        let arr = [];
+        try{ arr = JSON.parse(localStorage.getItem(key) || '[]'); }catch(e){ arr = []; }
+        arr.unshift(obj);
+        localStorage.setItem(key, JSON.stringify(arr));
+      }
+
+      async function postReception(obj){
+        try{
+          const res = (window.API && window.API.post) ? await window.API.post('/recepciones_previas', obj) : await fetch('/recepciones_previas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj) });
+          if(!res.ok) throw new Error('post failed');
+          return await res.json();
+        }catch(e){ console.warn('postReception failed', e); return null; }
+      }
+
+      // show receptions log (localStorage + API unchanged)
+      function loadReceptionsLog(){
+        let arr = [];
+        try{ arr = JSON.parse(localStorage.getItem('recepciones_previas') || '[]'); }catch(e){ arr = []; }
+        // also show saved 'recepciones_previas' in localStorage key we used
+        try{ const alt = JSON.parse(localStorage.getItem('recepciones_previas') || '[]'); if(Array.isArray(alt)) arr = arr.concat(alt); }catch(e){}
+        if(!arr.length) { receptionsLog.innerHTML = '<p>No hay recepciones registradas (local).</p>'; return; }
+        receptionsLog.innerHTML = arr.map(r=>`<div style="border:1px solid #eee;padding:8px;margin-bottom:8px;"><strong>${r.pedidoFinalId || '(manual)'} — ${r.date}</strong><div>${r.lines.map(l=>`<div>${l.productName||l.productId}: recibido ${l.qtyRecibida}/${l.qtyEsperada} ${l.discrepancy?'<strong style="color:#b91c1c">(DISCREPANCIA)</strong>':''}</div>`).join('')}</div></div>`).join('');
+      }
+
+      // load products helper
+      async function findProductByCode(code){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get(`/productos?codigo=${encodeURIComponent(code)}`) : await fetch(`/productos?codigo=${encodeURIComponent(code)}`);
+          if(!res.ok) return null;
+          const arr = await res.json();
+          return arr[0] || null;
+        }catch(e){ return null; }
+      }
+
+      // state for current expected lines
+      let expected = null; // object with lines: [{ productId, productName, qtyEsperada, qtyRecibida, pesoEsperado, pesoRecibido, precioEsperado, precioRecibido, discrepancy }]
+
+      function renderExpected(){
+        if(!expected){ expectedArea.innerHTML = '<p>No hay líneas cargadas.</p>'; return; }
+        expectedInfo.textContent = `Pedido final: ${expected.id} — ${expected.descripcion || ''}`;
+        const table = document.createElement('table'); table.className='table';
+        table.innerHTML = `<thead><tr><th>Producto</th><th>Esperado</th><th>Recibido</th><th>Peso rec.</th><th>Precio rec.</th><th></th></tr></thead>`;
+        const tbody = document.createElement('tbody');
+        expected.lines.forEach((ln, i)=>{
+          const tr = document.createElement('tr');
+          tr.dataset.i = i;
+          tr.innerHTML = `<td>${ln.productName || ln.productId}</td>
+            <td>${ln.qtyEsperada}</td>
+            <td><input type="number" value="${ln.qtyRecibida||0}" min="0" style="width:70px" data-field="qtyRecibida" /></td>
+            <td><input type="text" value="${ln.pesoRecibido||''}" data-field="pesoRecibido" style="width:90px" /></td>
+            <td><input type="text" value="${ln.precioRecibido||''}" data-field="precioRecibido" style="width:90px" /></td>
+            <td><button class="btn-small btn-mark-discrepancy">Marcar discrepancia</button></td>`;
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        expectedArea.innerHTML = '';
+        expectedArea.appendChild(table);
+
+        // wire inputs
+        expectedArea.querySelectorAll('input').forEach(inp=>{
+          inp.addEventListener('change', (ev)=>{
+            const tr = ev.target.closest('tr'); const idx = Number(tr.dataset.i); const field = ev.target.getAttribute('data-field'); expected.lines[idx][field] = (field==='qtyRecibida') ? Number(ev.target.value||0) : ev.target.value;
+            // auto-check discrepancy for qty
+            expected.lines[idx].discrepancy = (Number(expected.lines[idx].qtyRecibida||0) !== Number(expected.lines[idx].qtyEsperada||0));
+            renderExpected();
+          });
+        });
+        expectedArea.querySelectorAll('.btn-mark-discrepancy').forEach(btn=>btn.addEventListener('click', (e)=>{ const tr = e.target.closest('tr'); const idx = Number(tr.dataset.i); expected.lines[idx].discrepancy = true; renderExpected(); }));
+      }
+
+      // Load pedido finals into select
+      const pedidos = await loadPedidoFinales();
+      pedidoSel.innerHTML = '<option value="">-- Selecciona pedido final --</option>' + pedidos.map(p=>`<option value="${p.id}">${p.id} — ${p.descripcion||p.fecha||''}</option>`).join('');
+      if(!pedidos.length) pedidoSel.innerHTML = '<option value="">(No hay pedidos finales en la API)</option>';
+
+      // allow manual adding expected lines if no API
+      function buildEmptyExpected(){
+        expected = { id: 'manual-'+Date.now(), descripcion: 'Manual', lines: [] };
+        renderExpected();
+      }
+
+      btnLoadExpected.addEventListener('click', async ()=>{
+        const id = pedidoSel.value;
+        if(!id){ showToast('Selecciona un pedido primero o cree uno manualmente', { timeout:3000 }); return; }
+        const p = await getPedidoFinal(id);
+        if(!p){ showToast('No se encontró el pedido en la API; puedes crear uno manual.', { timeout:3000 }); buildEmptyExpected(); return; }
+        // normalize lines: productoId, productName, qtyEsperada
+        expected = { id: p.id, descripcion: p.descripcion || p.fecha || '', lines: (p.lineas || []).map(l=>({ productId: l.productId, productName: l.productName || l.nombre || l.productId, qtyEsperada: Number(l.qtySolicitada||l.qty||0), qtyRecibida: 0, pesoEsperado: l.pesoEsperado||'', pesoRecibido:'', precioEsperado: l.precioEstimado||'', precioRecibido:'', discrepancy:false })) };
+        renderExpected();
+        showToast('Líneas esperadas cargadas. Mantén el foco del escáner y empieza a comprobar.', { timeout:4000 });
+      });
+
+      // allow focusing scanner input created by scanner.js
+      focusScannerBtn.addEventListener('click', ()=>{ try{ if(typeof window.focusBarcodeInput === 'function') window.focusBarcodeInput(); else showToast('Scanner helper no disponible', { timeout:2000 }); }catch(e){ console.error(e); } });
+
+      // register barcode events
+      window.addEventListener('barcodeScanned', async (e)=>{
+        const code = e.detail.code;
+        if(!expected || !expected.lines || !expected.lines.length){ showToast('No hay líneas esperadas cargadas', { timeout:2000 }); return; }
+        // find product by code
+        const prod = await findProductByCode(code);
+        if(!prod){ // ask to add as extra
+          showToast(`Código ${code} no encontrado en productos`, { timeout:3000 }); return; }
+        // try to match line by productId
+        const idx = expected.lines.findIndex(l=>String(l.productId) === String(prod.id) || String(l.productName) === String(prod.nombre));
+        if(idx === -1){
+          // add as extra line
+          expected.lines.push({ productId: prod.id, productName: prod.nombre, qtyEsperada: 0, qtyRecibida: 1, pesoEsperado:'', pesoRecibido:'', precioEsperado:'', precioRecibido:'', discrepancy: true });
+          renderExpected();
+          showToast(`Producto extra añadido: ${prod.nombre} (recibido 1)`, { timeout:3000 });
+          return;
+        }
+        // increment received
+        expected.lines[idx].qtyRecibida = (Number(expected.lines[idx].qtyRecibida) || 0) + 1;
+        expected.lines[idx].discrepancy = Number(expected.lines[idx].qtyRecibida) !== Number(expected.lines[idx].qtyEsperada);
+        renderExpected();
+        showToast(`${prod.nombre} — recibido ${(expected.lines[idx].qtyRecibida)}`, { timeout:2000 });
+      });
+
+      // save reception (try API then fallback to localStorage)
+      btnSaveReception.addEventListener('click', async ()=>{
+        if(!expected){ showToast('No hay datos a guardar', { timeout:2000 }); return; }
+        const reception = { pedidoFinalId: expected.id, date: new Date().toLocaleString(), lines: expected.lines.map(l=>({ productId: l.productId, productName: l.productName, qtyEsperada: l.qtyEsperada, qtyRecibida: l.qtyRecibida || 0, pesoEsperado: l.pesoEsperado||'', pesoRecibido: l.pesoRecibido||'', precioEsperado: l.precioEsperado||'', precioRecibido: l.precioRecibido||'', discrepancy: !!l.discrepancy })) };
+        // try POST
+        const posted = await postReception(reception);
+        if(posted){ showToast('Recepción guardada en la API', { timeout:3000 }); }
+        else { saveReceptionLocal(reception); showToast('Recepción guardada localmente (localStorage)', { timeout:3000 }); }
+        // update receptions log
+        loadReceptionsLog();
+      });
+
+      // enable quick manual editing of expected (add line)
+      // simple UI: double click expectedArea to add a manual line
+      expectedArea.addEventListener('dblclick', ()=>{
+        const pid = prompt('ID producto o código:'); if(!pid) return; const name = prompt('Nombre (opcional):') || pid; const qty = Number(prompt('Cantidad esperada:', '1') || 1);
+        if(!expected) expected = { id: 'manual-'+Date.now(), descripcion:'Manual', lines:[] };
+        expected.lines.push({ productId: pid, productName: name, qtyEsperada: qty, qtyRecibida:0, pesoEsperado:'', pesoRecibido:'', precioEsperado:'', precioRecibido:'', discrepancy:false }); renderExpected(); showToast('Línea manual añadida', { timeout:2000 });
+      });
+
+      // initial load receptions log
+      loadReceptionsLog();
+
+    })();
+  </script>
+<section>
+  <h2>Recepción previa (legacy)</h2>
+  <p>Esta vista ha sido sustituida por la pestaña "Comprobación (Pedido final)" dentro de <a href="#/recepcion">Recepción</a>.</p>
+  <p>Usa el menú lateral para ir a Recepción.</p>
+</section>

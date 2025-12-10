@@ -1,0 +1,85 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  /* Fondo uniforme crema para toda la página */
+  background: linear-gradient(135deg, var(--cream), var(--cream-weak));
+}
+
+.login-box {
+  background-color: var(--cream);
+  padding: 40px 50px;
+  border-radius: 15px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  width: 320px;
+}
+
+.login-box .logo {
+  width: 150px;
+  margin-bottom: 15px;
+}
+
+.login-box h1 {
+  font-size: 1.6em;
+  margin-bottom: 20px;
+  color: var(--text-on-cream);
+}
+
+.login-box h2 {
+  font-size: 1.2em;
+  margin-bottom: 30px;
+  color: var(--muted);
+}
+
+.login-box form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.login-box input {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--cream-weak);
+  color: var(--text-on-cream);
+  outline: none;
+  transition: border 0.3s;
+}
+
+.login-box input:focus {
+  border-color: var(--accent);
+}
+
+.login-box button {
+  background: var(--accent);
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-on-cream);
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.login-box button:hover {
+  background: var(--accent-dark);
+}
+
+.register-link {
+  margin-top: 10px;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
+.register-link a:hover {
+  text-decoration: underline;
+}
+
+.error-message {
+  color: var(--danger);
+  margin-top: 10px;
+  font-size: 0.9em;
+}

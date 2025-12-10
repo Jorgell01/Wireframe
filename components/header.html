@@ -1,0 +1,67 @@
+<header class="topbar">
+  <div class="topbar__left">
+    <img src="../assets/img/logos/LOGO CIFP VIRGEN DE CANDELARIA.png" alt="Logo" class="topbar__logo" />
+  </div>
+
+  <div class="topbar__center">
+    <input id="globalSearch" class="topbar__search" type="search" placeholder="Buscar..." aria-label="Buscar en el panel" />
+  </div>
+
+  <div class="topbar__right">
+    <span class="topbar__user">👤 <span id="headerUser">Usuario</span></span>
+    <button id="logoutBtn" class="topbar__btn">Salir</button>
+  </div>
+</header>
+
+<script>
+  // Rellena el nombre y gestiona el logout
+  (function() {
+    const nameSpan = document.getElementById("headerUser");
+    // prefer Auth.getCurrentUser over localStorage
+    try {
+      const cu = (window.Auth && typeof window.Auth.getCurrentUser === 'function') ? window.Auth.getCurrentUser() : null;
+      if (cu && nameSpan) nameSpan.textContent = cu.username;
+    } catch(_){}
+
+    document.getElementById("logoutBtn")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      // Limpiar sesión y datos relevantes
+      try { if (window.Auth && typeof window.Auth.logout === 'function') window.Auth.logout(); } catch(_){ }
+      try { localStorage.removeItem("usuario"); } catch(_){ }
+      // Redirección robusta a la vista de login (relativa al documento actual)
+      const loginUrl = new URL('../views/login.html', location.href).href;
+      // replace() evita dejar la página anterior en el historial
+      location.replace(loginUrl);
+    });
+  })();
+
+    // Conectar búsqueda global con la navegación SPA
+    (function(){
+      const input = document.getElementById('globalSearch');
+      if (!input) return;
+
+      function gotoRoute(route){
+        if (!route) return;
+        // use hash navigation so router picks it up
+        window.location.hash = route;
+        input.blur();
+      }
+
+      input.addEventListener('keydown', (ev)=>{
+        if (ev.key !== 'Enter') return;
+        const q = input.value.trim().toLowerCase();
+        if (!q) return;
+        // map common keywords to routes
+        if (q.includes('producto') || q.includes('prod')) return gotoRoute('#/productos');
+        if (q.includes('categor') || q.includes('cat')) return gotoRoute('#/categorias');
+        if (q.includes('proveedor') || q.includes('prov')) return gotoRoute('#/proveedores');
+        if (q.includes('dash') || q.includes('inicio') || q.includes('home')) return gotoRoute('#/dashboard');
+        // fallback: try to match exact route names
+        if (q === 'productos' || q === 'productos') return gotoRoute('#/productos');
+        if (q === 'categorias' || q === 'categorías') return gotoRoute('#/categorias');
+        if (q === 'proveedores') return gotoRoute('#/proveedores');
+        // no match -> show dashboard
+        gotoRoute('#/dashboard');
+      });
+    })();
+</script>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pedidos finales | Proyecto</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<section>
+  <h2>🧾 Gestión de Pedido Final</h2>
+
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+    <div style="flex:1;min-width:300px;">
+      <label class="form-row"><span style="font-weight:600">Buscar/Filtrar</span><input id="pf-filter" placeholder="Texto..." /></label>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="btnNewPF" class="btn-primary">Nuevo Pedido Final</button>
+    </div>
+  </div>
+
+  <div id="pfListArea"><p>Cargando pedidos...</p></div>
+
+  <div id="pfFormArea" style="margin-top:12px;"></div>
+
+  <script>
+    (async function(){
+      const listArea = document.getElementById('pfListArea');
+      const formArea = document.getElementById('pfFormArea');
+      const filter = document.getElementById('pf-filter');
+      const btnNew = document.getElementById('btnNewPF');
+
+      async function loadPedidoFinales(){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get('/pedido_finales') : await fetch('/pedido_finales');
+          if(!res.ok) throw new Error('No API');
+          const arr = await res.json();
+          return arr;
+        }catch(e){ console.warn('loadPedidoFinales', e); return []; }
+      }
+
+      async function loadProducts(){
+        try{
+          const res = (window.API && window.API.get) ? await window.API.get('/productos') : await fetch('/productos');
+          if(!res.ok) throw new Error('No products');
+          return await res.json();
+        }catch(e){ console.warn('loadProducts', e); return []; }
+      }
+
+      let products = await loadProducts();
+
+      function renderList(items){
+        if(!items.length) { listArea.innerHTML = '<p>No hay pedidos finales.</p>'; return; }
+        const html = items.map(p=>{
+          const total = (p.lineas||[]).reduce((s,l)=>s + (Number(l.qtySolicitada||l.qty||0)||0),0);
+          return `<div style="border:1px solid #eee;padding:10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between"><div>
+            <strong>${p.id}</strong> — ${p.descripcion || p.fecha || ''}<div style="color:var(--muted);font-size:0.9rem">Líneas: ${(p.lineas||[]).length} — Total unidades: ${total}</div>
+          </div>
+          <div style="display:flex;gap:8px"><button class="btn-small btn-edit" data-id="${p.id}">Editar</button><button class="btn-small btn-delete" data-id="${p.id}">Borrar</button></div></div>`;
+        }).join('');
+        listArea.innerHTML = html;
+        listArea.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click', onDeletePF));
+        listArea.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click', onEditPF));
+      }
+
+      async function refresh(){
+        const arr = await loadPedidoFinales();
+        const q = filter.value.trim().toLowerCase();
+        const out = arr.filter(p=>{ if(!q) return true; return (p.id||'').toLowerCase().includes(q) || (p.descripcion||'').toLowerCase().includes(q); });
+        renderList(out);
+      }
+
+      filter.addEventListener('input', refresh);
+
+      btnNew.addEventListener('click', ()=> showPFForm());
+
+      function showPFForm(initial){
+        formArea.innerHTML = '';
+        const wrap = document.createElement('div'); wrap.className = 'product-form-wrapper';
+        wrap.innerHTML = `
+          <h3>${initial ? 'Editar Pedido Final' : 'Nuevo Pedido Final'}</h3>
+          <div class="form-row"><label>Id <input id="pf-id" value="${initial?.id||('PF-'+Date.now())}" /></label></div>
+            <div id="pf-error" style="color:#b91c1c;margin-top:8px;display:none"></div>
+          <div class="form-row"><label>Descripción <input id="pf-desc" value="${initial?.descripcion||''}" /></label></div>
+          <div class="form-row"><label>Fecha <input id="pf-fecha" type="date" value="${initial?.fecha||new Date().toISOString().slice(0,10)}" /></label></div>
+          <div style="margin-top:8px"><strong>Líneas</strong>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+              <select id="pf-prodSel"><option value="">Cargando productos...</option></select>
+              <input id="pf-qty" type="number" min="1" value="1" style="width:90px" />
+              <button id="pf-addLine" class="btn-secondary">Agregar línea</button>
+              <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                <select id="pf-import-src"><option value="">Importar desde pedido profesor...</option></select>
+                <button id="pf-import-btn" class="btn-secondary">Importar</button>
+              </div>
+            </div>
+            <div id="pf-lines" style="margin-top:8px"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px"><button id="pf-save" class="btn-primary">Guardar</button><button id="pf-cancel" class="btn-secondary">Cancelar</button></div>
+        `;
+        formArea.appendChild(wrap);
+
+        const prodSel = document.getElementById('pf-prodSel'); const linesDiv = document.getElementById('pf-lines');
+        // fill products
+        prodSel.innerHTML = '<option value="">-- Selecciona producto --</option>' + products.map(p=>`<option value="${p.id}" data-name="${p.nombre||p.name||''}">${p.id} — ${p.nombre||p.name||''}</option>`).join('');
+
+        let lines = (initial && initial.lineas) ? initial.lineas.map(l=>({ productId: l.productId, productName: l.productName || l.nombre || '', qtySolicitada: Number(l.qtySolicitada||l.qty||0) })) : [];
+
+        function renderLines(){
+          if(!lines.length) { linesDiv.innerHTML = '<p>No hay líneas añadidas.</p>'; return; }
+          linesDiv.innerHTML = '<table class="table"><thead><tr><th>Producto</th><th>Nombre</th><th>Cantidad</th><th></th></tr></thead><tbody>' +
+            lines.map((ln,i)=>`<tr data-i="${i}"><td>${ln.productId}</td><td>${ln.productName}</td><td><input class="line-qty" data-i="${i}" type="number" value="${ln.qtySolicitada}" style="width:80px" /></td><td><button class="btn-small btn-rem" data-i="${i}">Eliminar</button></td></tr>`).join('') +
+            '</tbody></table>';
+          linesDiv.querySelectorAll('.btn-rem').forEach(b=>b.addEventListener('click', (e)=>{ const i=Number(e.target.getAttribute('data-i')); lines.splice(i,1); renderLines(); }));
+          linesDiv.querySelectorAll('.line-qty').forEach(inp=>inp.addEventListener('change', (e)=>{ const i=Number(e.target.getAttribute('data-i')); lines[i].qtySolicitada = Number(e.target.value || 0); }));
+        }
+
+        renderLines();
+
+        document.getElementById('pf-addLine').addEventListener('click', ()=>{
+          const pid = prodSel.value; if(!pid) return alert('Selecciona un producto');
+          const pname = prodSel.options[prodSel.selectedIndex].getAttribute('data-name') || 'Producto';
+          const qty = Number(document.getElementById('pf-qty').value) || 1;
+          const existing = lines.find(x=>String(x.productId) === String(pid));
+          if(existing){ existing.qtySolicitada += qty; } else { lines.push({ productId: pid, productName: pname, qtySolicitada: qty }); }
+          renderLines();
+        });
+
+        // Load pedidos_profesores into import select
+        (async function loadImportSources(){
+          try{
+            const res = (window.API && window.API.get) ? await window.API.get('/pedidos_profesores') : await fetch('/pedidos_profesores');
+            if(!res.ok) throw new Error('No API');
+            const arr = await res.json();
+            const sel = document.getElementById('pf-import-src');
+            sel.innerHTML = '<option value="">Importar desde pedido profesor...</option>' + arr.map(p=>`<option value="${p.id}">${p.id} — ${p.profesor||p.aula||''}</option>`).join('');
+          }catch(e){ console.warn('loadImportSources', e); }
+        })();
+
+        document.getElementById('pf-import-btn').addEventListener('click', async ()=>{
+          const src = document.getElementById('pf-import-src').value; if(!src) return alert('Selecciona un pedido de profesor para importar');
+          try{
+            const res = (window.API && window.API.get) ? await window.API.get(`/pedidos_profesores/${src}`) : await fetch(`/pedidos_profesores/${src}`);
+            if(!res.ok) throw new Error('No encontrado');
+            const p = await res.json();
+            // merge lines: add qty to existing product lines or push new
+            (p.lineas || []).forEach(l=>{
+              const existing = lines.find(x=>String(x.productId) === String(l.productId));
+              if(existing) existing.qtySolicitada = Number(existing.qtySolicitada || 0) + Number(l.qty || 0);
+              else lines.push({ productId: l.productId, productName: l.productName||'', qtySolicitada: Number(l.qty||0) });
+            });
+            renderLines();
+            alert('Líneas importadas desde '+src);
+          }catch(e){ alert('No se pudo importar: '+e.message); }
+        });
+
+        document.getElementById('pf-cancel').addEventListener('click', ()=>{ formArea.innerHTML=''; });
+
+        document.getElementById('pf-save').addEventListener('click', async ()=>{
+          const errEl = document.getElementById('pf-error'); errEl.style.display='none'; errEl.textContent='';
+          const idVal = document.getElementById('pf-id').value.trim();
+          if(!idVal){ errEl.textContent = 'El campo Id es obligatorio.'; errEl.style.display='block'; return; }
+          if(!lines || !lines.length){ errEl.textContent = 'Añade al menos una línea al pedido.'; errEl.style.display='block'; return; }
+
+          const payload = { id: idVal, descripcion: document.getElementById('pf-desc').value.trim(), fecha: document.getElementById('pf-fecha').value, responsableId: '1', lineas: lines.map(l=>({ productId: l.productId, productName: l.productName, qtySolicitada: l.qtySolicitada })) };
+          try{
+            if(initial && initial.id){
+              const res = (window.API && window.API.put) ? await window.API.put(`/pedido_finales/${initial.id}`, payload) : await fetch(`/pedido_finales/${initial.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+              if(!res.ok) throw new Error('Error actualizando');
+            } else {
+              const res = (window.API && window.API.post) ? await window.API.post('/pedido_finales', payload) : await fetch('/pedido_finales', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+              if(!res.ok) throw new Error('Error creando');
+            }
+            formArea.innerHTML='';
+            await refresh();
+          }catch(e){ errEl.textContent = 'Error guardando pedido: '+e.message; errEl.style.display='block'; }
+        });
+      }
+
+      async function onDeletePF(e){
+        const id = e.target.getAttribute('data-id');
+        if(!confirm('Borrar pedido final '+id+'?')) return;
+        try{
+          const res = (window.API && window.API.del) ? await window.API.del(`/pedido_finales/${id}`) : await fetch(`/pedido_finales/${id}`, { method:'DELETE' });
+          if(!res.ok) throw new Error('Error borrando');
+          await refresh();
+        }catch(e){ alert('No se pudo borrar: '+e.message); }
+      }
+
+      function onEditPF(e){
+        const id = e.target.getAttribute('data-id');
+        // fetch single
+        (async ()=>{
+          try{
+            const res = (window.API && window.API.get) ? await window.API.get(`/pedido_finales/${id}`) : await fetch(`/pedido_finales/${id}`);
+            if(!res.ok) throw new Error('No encontrado');
+            const p = await res.json();
+            showPFForm(p);
+          }catch(e){ alert('No se pudo cargar pedido: '+e.message); }
+        })();
+      }
+
+      // initial
+      await refresh();
+
+    })();
+  </script>
+</section>
+</body>
+</html>

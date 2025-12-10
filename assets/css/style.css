@@ -1,0 +1,48 @@
+:root {
+  /* Paleta profesional inspirada en el logo (rojo acento + tipografía negra + crema) */
+  --black: #0f1112;            /* texto principal muy oscuro */
+  --charcoal: #0b1220;         /* color oscuro para surfaces (sidebar) */
+  --cream: #fff7f0;            /* superficies claras (tarjetas, formularios) */
+  --cream-weak: #fff3ea;       /* variante suave para inputs, tablas, etc */
+  --surface-dark: var(--charcoal); /* sidebar/header dark moved to sidebar */
+
+  --text-on-dark: #ffffff;     /* texto claro sobre fondos oscuros */
+  --text-on-cream: #0f1112;    /* texto oscuro sobre crema */
+
+  --muted: #7b7b7b;            /* textos secundarios */
+  --accent: #d93f2d;           /* rojo/engranaje del logo (slightly adjusted) */
+  --accent-dark: #b93622;      /* versión más oscura para hover */
+  --border: rgba(15,17,18,0.08);/* bordes discretos sobre crema */
+  --success: #16a34a;          /* verde para acciones OK */
+  --danger: #ef4444;           /* rojo error */
+}
+
+body {
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--cream);
+  color: var(--text-on-cream);
+}
+
+h1 {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+button {
+  background: var(--accent);
+  border: none;
+  padding: 10px 16px;
+  color: var(--text-on-cream);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-dark);
+}

@@ -1,0 +1,144 @@
+<section>
+  <h2>Proveedores</h2>
+
+  <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:12px;">
+    <div style="flex:1">
+      <p id="proveedores-status">Cargando proveedores...</p>
+    </div>
+    <div>
+      <button id="btnCreateProvider" class="btn-primary">Crear Proveedor</button>
+    </div>
+  </div>
+
+  <div id="provider-form-area"></div>
+  <div id="proveedores-list"></div>
+
+  <script>
+    (async function(){
+      const listEl = document.getElementById('proveedores-list');
+      const status = document.getElementById('proveedores-status');
+      const formArea = document.getElementById('provider-form-area');
+      const createBtn = document.getElementById('btnCreateProvider');
+
+      function renderProviderItem(p){
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        li.dataset.id = p.id;
+        li.innerHTML = `<span class="provider-text">${p.id} — ${p.nombre||p.name} — ${p.contacto||p.contact||''}</span> <div style="display:inline-flex;gap:6px;margin-left:8px;"><button class="btn-edit" data-id="${p.id}">Editar</button><button class="btn-delete" data-id="${p.id}">Borrar</button></div>`;
+        return li;
+      }
+
+      async function loadProviders(){
+        try {
+          const loader = (window.API && window.API.get) ? window.API.get('/proveedores') : fetch('/proveedores');
+          const res = await loader;
+          if (!res.ok) throw new Error('No hay API disponible');
+          const data = await res.json();
+          status.textContent = '';
+          if (!data.length) { status.textContent = 'No hay proveedores.'; }
+          const ul = document.createElement('ul'); ul.className = 'list';
+          data.forEach(p=> ul.appendChild(renderProviderItem(p)));
+          listEl.innerHTML = ''; listEl.appendChild(ul);
+        } catch (e) {
+          status.textContent = 'No se ha podido conectar con la API. Ejemplo:';
+          listEl.innerHTML = `
+            <ul class="list">
+              <li class="list-item">1 — Proveedor Alfa — contacto@alfa.com</li>
+              <li class="list-item">2 — Distribuciones Beta — ventas@beta.com</li>
+            </ul>`;
+          console.warn(e);
+        }
+      }
+
+      // delegate edit/delete clicks
+      listEl.addEventListener('click', async (ev)=>{
+        const editBtn = ev.target.closest('.btn-edit');
+        const delBtn = ev.target.closest('.btn-delete');
+        if (editBtn){
+          const id = editBtn.dataset.id;
+          // fetch provider data (or read from DOM)
+          let provider = null;
+          try {
+            const res = (window.API && window.API.get) ? await window.API.get(`/proveedores/${id}`) : await fetch(`/proveedores/${id}`);
+            provider = res.ok ? await res.json() : null;
+          } catch(e){ provider = null; }
+          // fallback: parse text
+          if (!provider){
+            const li = editBtn.closest('li');
+            const txt = li.querySelector('.provider-text').textContent || '';
+            const parts = txt.split('—').map(s=>s.trim());
+            provider = { id:id, nombre: parts[1]||'', contacto: parts[2]||'' };
+          }
+          formArea.innerHTML = '';
+          const wrapper = document.createElement('div'); wrapper.className='product-form-wrapper';
+          wrapper.innerHTML = `
+            <h3>Editar Proveedor</h3>
+            <div class="form-row"><label>Nombre<input id="pr-name-edit" value="${(provider.nombre||provider.name||'').replace(/"/g,'&quot;')}" /></label></div>
+            <div class="form-row"><label>Contacto<input id="pr-contact-edit" value="${(provider.contacto||provider.contact||'').replace(/"/g,'&quot;')}" /></label></div>
+            <div style="display:flex;gap:8px;margin-top:8px;"><button id="pr-save-edit" class="btn-primary">Guardar</button><button id="pr-cancel-edit" class="btn-secondary">Cancelar</button></div>
+          `;
+          formArea.appendChild(wrapper);
+          // smooth scroll and focus
+          try { wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_){ }
+          try { document.getElementById('pr-name-edit').focus(); } catch(_){ }
+          document.getElementById('pr-cancel-edit').addEventListener('click', ()=>{ formArea.innerHTML=''; });
+          document.getElementById('pr-save-edit').addEventListener('click', async ()=>{
+            const payload = { nombre: document.getElementById('pr-name-edit').value.trim(), contacto: document.getElementById('pr-contact-edit').value.trim() };
+            try {
+              const res = (window.API && window.API.put) ? await window.API.put(`/proveedores/${id}`, payload) : await fetch(`/proveedores/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+              if (!res.ok) throw new Error('Error actualizando proveedor');
+              const updated = await res.json();
+              // update DOM
+              const li = listEl.querySelector(`li[data-id="${id}"]`);
+              if (li) li.querySelector('.provider-text').textContent = `${updated.id} — ${updated.nombre||updated.name} — ${updated.contacto||updated.contact||''}`;
+              formArea.innerHTML = '';
+            } catch(err){ alert('Error: '+err.message); }
+          });
+        }
+        if (delBtn){
+          const id = delBtn.dataset.id;
+          if (!confirm('¿Borrar proveedor #' + id + '?')) return;
+          try {
+            const res = (window.API && window.API.del) ? await window.API.del(`/proveedores/${id}`) : await fetch(`/proveedores/${id}`, {method:'DELETE'});
+            if (!res.ok) throw new Error('Error borrando proveedor');
+            const li = listEl.querySelector(`li[data-id="${id}"]`);
+            if (li) li.remove();
+          } catch(err){ alert('Error: '+err.message); }
+        }
+      });
+
+      // create new provider
+      createBtn.addEventListener('click', ()=>{
+        formArea.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'product-form-wrapper';
+        wrapper.innerHTML = `
+          <h3>Nuevo Proveedor</h3>
+          <div class="form-row"><label>Nombre<input id="pr-name" /></label></div>
+          <div class="form-row"><label>Contacto<input id="pr-contact" /></label></div>
+          <div style="display:flex;gap:8px;margin-top:8px;"><button id="pr-save" class="btn-primary">Crear</button><button id="pr-cancel" class="btn-secondary">Cancelar</button></div>
+        `;
+        formArea.appendChild(wrapper);
+        // smooth scroll and focus
+        try { wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_){ }
+        try { document.getElementById('pr-name').focus(); } catch(_){ }
+        document.getElementById('pr-cancel').addEventListener('click', ()=>{ formArea.innerHTML=''; });
+        document.getElementById('pr-save').addEventListener('click', async ()=>{
+          const payload = { nombre: document.getElementById('pr-name').value.trim(), contacto: document.getElementById('pr-contact').value.trim() };
+          try {
+            const res = (window.API && window.API.post) ? await window.API.post('/proveedores', payload) : await fetch('/proveedores', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            if (!res.ok) throw new Error('Error creando proveedor');
+            const created = await res.json();
+            const ul = listEl.querySelector('.list') || (function(){ const u=document.createElement('ul'); u.className='list'; listEl.innerHTML=''; listEl.appendChild(u); return u; })();
+            ul.insertBefore(renderProviderItem(created), ul.firstChild);
+            formArea.innerHTML='';
+          } catch (err) { alert('Error: '+err.message); }
+        });
+      });
+
+      // initial load
+      loadProviders();
+
+    })();
+  </script>
+</section>
