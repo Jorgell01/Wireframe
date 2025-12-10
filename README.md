@@ -27,10 +27,6 @@ Principales objetivos:
 
 Ejemplo con Live Server: clic derecho sobre `index.html` → "Open with Live Server".
 
-Credenciales por defecto (simuladas):
-- Usuario: `admin`
-- Contraseña: `1234`
-
 Al iniciar sesión correctamente, el proyecto guarda el nombre de usuario en `localStorage` y redirige a `dashboard.html`.
 
 ---
