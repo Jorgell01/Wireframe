@@ -101,7 +101,7 @@ Pruebas útiles:
 
 ## 👤 Autor
 
-Jorge A. Herrero Santana (Pude)
+Jorge A. Herrero Santana
 
 Proyecto Intermodular — 2025
 IES Canarias
