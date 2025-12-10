@@ -1,4 +1,4 @@
-// Simple SPA router: carga vistas en #app y gestiona el estado de sidebar
+// Simple SPA router: loads views into #app and manages sidebar state
 (function () {
   const routes = {
     '': '/views/home.html',
@@ -20,14 +20,14 @@
     if (!app) return;
     try {
       let file = routes[path] || '/views/home.html';
-      // dynamic route: #/producto/:id
+      // Dynamic route: #/producto/:id
       if (path.startsWith('#/producto/')) {
         file = routes['#/producto'];
       }
       const res = await fetch(file, { cache: 'no-cache' });
       if (!res.ok) throw new Error(res.statusText);
       app.innerHTML = await res.text();
-      // Ejecutar scripts incluidos en la vista cargada
+      // Execute inline/external scripts found in the loaded view
       Array.from(app.querySelectorAll('script')).forEach(old => {
         const s = document.createElement('script');
         if (old.src) {
@@ -39,7 +39,7 @@
         document.body.appendChild(s);
       });
     } catch (e) {
-      app.innerHTML = `<div style="padding:12px;background:#fff3f2;border-radius:8px;color:#7a1f0d;">Error cargando la vista: ${e.message}</div>`;
+      app.innerHTML = `<div style="padding:12px;background:#fff3f2;border-radius:8px;color:#7a1f0d;">Error loading view: ${e.message}</div>`;
       console.error(e);
     }
   }
@@ -56,7 +56,7 @@
     const a = e.target.closest('a');
     if (!a) return;
     const href = a.getAttribute('href');
-    if (!href || !href.startsWith('#')) return; // external
+    if (!href || !href.startsWith('#')) return; // external link
     e.preventDefault();
     history.pushState(null, '', href);
     router.render();
@@ -69,7 +69,7 @@
       setActiveLink();
     },
     init() {
-      // delegate clicks from sidebar
+      // Delegate clicks from sidebar
       const sidebar = document.getElementById('sidebar') || document.querySelector('.sidebar');
       if (sidebar) {
         sidebar.addEventListener('click', onNavClick);
@@ -94,7 +94,7 @@
 
   // Also init when DOM is ready (in case fragments are already present)
   document.addEventListener('DOMContentLoaded', () => {
-    // small timeout allows fragments inserted by dashboard.js to be parsed
+    // Small timeout allows fragments inserted by dashboard.js to be parsed
     setTimeout(() => {
       if (document.getElementById('sidebar')) router.init();
     }, 50);

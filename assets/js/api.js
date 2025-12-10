@@ -1,6 +1,6 @@
-// API helper: define base URL for json-server and simple helpers
+// API helper: defines base URL for json-server and simple helpers
 (function(){
-  // Detectar entorno local y apuntar al puerto usado por el script `api` en package.json
+  // Detect local environment and point to the port used by `api` script in package.json
   const defaultLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
   window.API_BASE = defaultLocal ? 'http://localhost:3001' : '';
 
@@ -52,7 +52,7 @@
   async function registerUser({username, email, password}){
     if (!username || !password) throw new Error('Username and password required');
     const users = readUsers();
-    if (users.find(u=>u.username===username || (email && u.email===email))) throw new Error('Usuario ya existente');
+    if (users.find(u=>u.username===username || (email && u.email===email))) throw new Error('User already exists');
     const salt = randomId();
     const pwdHash = await hashPassword(password, salt);
     const user = { id: randomId(), username, email: email||'', salt, pwdHash, createdAt: new Date().toISOString() };
@@ -63,14 +63,14 @@
   async function loginUser({username, password}){
     const users = readUsers();
     const user = users.find(u=>u.username===username);
-    if (!user) throw new Error('Usuario o contraseña incorrectos');
+    if (!user) throw new Error('Incorrect username or password');
     const tryHash = await hashPassword(password, user.salt);
-    if (tryHash !== user.pwdHash) throw new Error('Usuario o contraseña incorrectos');
+    if (tryHash !== user.pwdHash) throw new Error('Incorrect username or password');
 
-    // create session token
+    // Create session token
     const token = randomId() + '.' + randomId();
     const sessions = readSessions();
-    // expiry 7 days
+    // Expiry: 7 days
     sessions[token] = { userId: user.id, expires: Date.now() + 7*24*3600*1000 };
     writeSessions(sessions);
     setCookie('wf_session', token, 7);
