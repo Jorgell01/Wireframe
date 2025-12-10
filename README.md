@@ -44,7 +44,6 @@ Login/Registro:
 - `window.Auth` persiste usuarios en `localStorage` (`wf_users`) y sesiones (`wf_sessions` + cookie `wf_session`).
 =======
 Al iniciar sesión correctamente, el proyecto guarda el nombre de usuario en `localStorage` y redirige a `dashboard.html`.
->>>>>>> 0b6b72c81c363d695358d5aa815e6aacdcd7566a
 
 ---
 
